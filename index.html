@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lluvia CDMX · Tiempo real</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<style>
+  :root{
+    --ink:#0a1628; --paper:#0d1b2a; --panel:#12263a; --line:#1e3a52;
+    --mist:#8fa8bf; --text:#e8f1f8; --dry:#3d5a73;
+    --drizzle:#4cc9f0; --rain:#4361ee; --storm:#7209b7; --downpour:#f72585;
+    --accent:#4cc9f0;
+    --mono:"SFMono-Regular",ui-monospace,"Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
+    --disp:"Bahnschrift","DIN Alternate","Segoe UI",system-ui,sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    background:var(--ink); color:var(--text); font-family:var(--mono);
+    display:grid; grid-template-columns:340px 1fr; grid-template-rows:100vh; overflow:hidden;
+  }
+  @media (max-width:820px){
+    body{grid-template-columns:1fr;grid-template-rows:auto 1fr;overflow:auto}
+  }
+  aside{background:var(--paper);border-right:1px solid var(--line);display:flex;flex-direction:column;overflow-y:auto}
+  @media (max-width:820px){aside{border-right:none;border-bottom:1px solid var(--line)}}
+  .brand{padding:22px 22px 16px;border-bottom:1px solid var(--line)}
+  .brand .kicker{font-size:10px;letter-spacing:.32em;text-transform:uppercase;color:var(--mist);margin-bottom:10px}
+  .brand h1{font-family:var(--disp);font-weight:700;font-size:30px;line-height:.95;letter-spacing:.01em}
+  .brand h1 span{display:block;color:var(--accent)}
+  .brand .sub{font-size:11px;color:var(--mist);margin-top:10px;line-height:1.5}
+  .live{display:flex;align-items:center;gap:8px;padding:12px 22px;border-bottom:1px solid var(--line);
+    font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mist)}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--downpour);
+    box-shadow:0 0 0 0 rgba(247,37,133,.6);animation:pulse 2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(247,37,133,.55)}70%{box-shadow:0 0 0 9px rgba(247,37,133,0)}100%{box-shadow:0 0 0 0 rgba(247,37,133,0)}}
+  .live.stale .dot{background:var(--dry);animation:none;box-shadow:none}
+  .live.err .dot{background:#f7b731;animation:none;box-shadow:none}
+  .block{padding:18px 22px;border-bottom:1px solid var(--line)}
+  .block h2{font-size:10px;letter-spacing:.28em;text-transform:uppercase;color:var(--mist);margin-bottom:14px;font-weight:600}
+  .stat{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}
+  .stat:last-child{margin-bottom:0}
+  .stat .lbl{font-size:12px;color:var(--mist)}
+  .stat .val{font-family:var(--disp);font-weight:700;font-size:22px;font-variant-numeric:tabular-nums}
+  .stat .val small{font-size:11px;font-weight:400;color:var(--mist);margin-left:3px}
+  .legend-row{display:flex;align-items:center;gap:10px;margin-bottom:9px;font-size:11px}
+  .legend-row:last-child{margin-bottom:0}
+  .sw{width:26px;height:10px;border-radius:2px;flex-shrink:0}
+  .legend-row .rng{color:var(--mist);margin-left:auto;font-variant-numeric:tabular-nums}
+  .arrow-key{display:flex;align-items:center;gap:12px;font-size:11px;color:var(--mist);line-height:1.5}
+  .arrow-key svg{flex-shrink:0}
+  .toggles{display:flex;flex-direction:column;gap:10px}
+  .tog{display:flex;align-items:center;justify-content:space-between;font-size:12px;cursor:pointer;user-select:none}
+  .tog input{position:absolute;opacity:0;pointer-events:none}
+  .track{width:38px;height:20px;border-radius:20px;background:var(--line);position:relative;transition:background .2s;flex-shrink:0}
+  .track::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--mist);transition:transform .2s,background .2s}
+  .tog input:checked + .track{background:var(--accent)}
+  .tog input:checked + .track::after{transform:translateX(18px);background:#fff}
+  .tog input:focus-visible + .track{outline:2px solid var(--accent);outline-offset:2px}
+  .foot{margin-top:auto;padding:16px 22px;font-size:10px;color:var(--dry);line-height:1.6}
+  .foot a{color:var(--mist);text-decoration:none;border-bottom:1px solid var(--line)}
+  main{position:relative;min-height:320px}
+  #map{position:absolute;inset:0;background:var(--ink)}
+  .leaflet-container{background:#081018}
+  /* vector overlay must NOT block map controls: sits under Leaflet's control panes */
+  #vec{position:absolute;inset:0;z-index:400;pointer-events:none}
+  .updating{position:absolute;top:14px;right:14px;z-index:500;background:rgba(13,27,42,.9);
+    border:1px solid var(--line);padding:7px 14px;border-radius:20px;font-size:11px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--mist);display:flex;align-items:center;gap:8px;opacity:0;transition:opacity .3s}
+  .updating.on{opacity:1}
+  .spin{width:11px;height:11px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .hint{position:absolute;bottom:14px;left:14px;z-index:500;background:rgba(13,27,42,.9);border:1px solid var(--line);
+    padding:8px 13px;border-radius:8px;font-size:10px;color:var(--mist);letter-spacing:.04em;max-width:240px;line-height:1.5}
+  .banner{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:600;background:#3a1220;
+    border:1px solid #f72585;color:#ffd6e6;padding:9px 16px;border-radius:8px;font-size:11px;max-width:80%;
+    text-align:center;display:none}
+  .banner.on{display:block}
+  @media (prefers-reduced-motion:reduce){.dot,.spin{animation:none}}
+</style>
+</head>
+<body>
+<aside>
+  <div class="brand">
+    <div class="kicker">Ciudad de México · Radar sintético</div>
+    <h1>LLUVIA<span>en vivo</span></h1>
+    <div class="sub">Intensidad de precipitación y dirección del sistema, muestreada sobre una malla del Valle de México.</div>
+  </div>
+  <div class="live" id="liveBar"><span class="dot"></span><span id="liveTxt">Conectando…</span></div>
+  <div class="block">
+    <h2>Ahora mismo</h2>
+    <div class="stat"><span class="lbl">Lluvia máx. en malla</span><span class="val" id="mMax">—<small>mm/h</small></span></div>
+    <div class="stat"><span class="lbl">Cobertura con lluvia</span><span class="val" id="mCov">—<small>%</small></span></div>
+    <div class="stat"><span class="lbl">Se mueve hacia</span><span class="val" id="mDir">—</span></div>
+    <div class="stat"><span class="lbl">Viento medio</span><span class="val" id="mWind">—<small>km/h</small></span></div>
+  </div>
+  <div class="block">
+    <h2>Intensidad · heatmap</h2>
+    <div class="legend-row"><span class="sw" style="background:var(--dry)"></span>Sin lluvia<span class="rng">0</span></div>
+    <div class="legend-row"><span class="sw" style="background:var(--drizzle)"></span>Llovizna<span class="rng">0.1–1</span></div>
+    <div class="legend-row"><span class="sw" style="background:var(--rain)"></span>Lluvia<span class="rng">1–4</span></div>
+    <div class="legend-row"><span class="sw" style="background:var(--storm)"></span>Fuerte<span class="rng">4–8</span></div>
+    <div class="legend-row"><span class="sw" style="background:var(--downpour)"></span>Torrencial<span class="rng">8+ mm/h</span></div>
+  </div>
+  <div class="block">
+    <h2>Dirección · campo vectorial</h2>
+    <div class="arrow-key">
+      <svg width="42" height="24" viewBox="0 0 42 24">
+        <defs><marker id="hk" markerWidth="6" markerHeight="6" refX="4" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6 Z" fill="#4cc9f0"/></marker></defs>
+        <line x1="4" y1="12" x2="32" y2="12" stroke="#4cc9f0" stroke-width="2" marker-end="url(#hk)"/>
+      </svg>
+      <span>La flecha apunta hacia donde se desplaza la lluvia. Su largo crece con la velocidad del viento.</span>
+    </div>
+  </div>
+  <div class="block">
+    <h2>Capas</h2>
+    <div class="toggles">
+      <label class="tog"><span>Mapa de calor</span><input type="checkbox" id="tHeat" checked><span class="track"></span></label>
+      <label class="tog"><span>Campo vectorial</span><input type="checkbox" id="tVec" checked><span class="track"></span></label>
+      <label class="tog"><span>Auto-actualizar (60 s)</span><input type="checkbox" id="tAuto" checked><span class="track"></span></label>
+    </div>
+  </div>
+  <div class="foot">
+    Datos: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> · sin API key.
+    Malla de 6×6 sobre CDMX. La dirección del sistema se estima del viento a 10 m.
+    <br><br>Última actualización: <span id="stamp">—</span>
+  </div>
+</aside>
+<main>
+  <div id="map"></div>
+  <svg id="vec"></svg>
+  <div class="updating" id="upd"><span class="spin"></span>Actualizando</div>
+  <div class="hint">Arrastra y haz zoom. El heatmap y las flechas se recalculan con cada actualización.</div>
+  <div class="banner" id="banner"></div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
+<script>
+"use strict";
+(function(){
+  var banner=document.getElementById('banner');
+  function showBanner(msg){ banner.textContent=msg; banner.classList.add('on'); }
+  function setLive(txt,cls){
+    document.getElementById('liveTxt').textContent=txt;
+    var b=document.getElementById('liveBar'); b.className='live'+(cls?' '+cls:'');
+  }
+
+  // guard: Leaflet must be present
+  if(typeof L==='undefined'){
+    showBanner('No se pudo cargar Leaflet (revisa tu conexión y recarga).');
+    setLive('Error al cargar el mapa','err'); return;
+  }
+
+  // ---------- config ----------
+  var BOUNDS={latN:19.59,latS:19.24,lonW:-99.36,lonE:-98.94};
+  var NX=6,NY=6, CENTER=[19.42,-99.13], REFRESH_MS=60000;
+  var grid=[];
+  for(var j=0;j<NY;j++){for(var i=0;i<NX;i++){
+    grid.push({
+      lat:BOUNDS.latS+(BOUNDS.latN-BOUNDS.latS)*(j/(NY-1)),
+      lon:BOUNDS.lonW+(BOUNDS.lonE-BOUNDS.lonW)*(i/(NX-1))
+    });
+  }}
+
+  // ---------- map ----------
+  var map=L.map('map',{zoomControl:true,attributionControl:false}).setView(CENTER,11);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+    {maxZoom:18,subdomains:'abcd'}).addTo(map);
+
+  // ---------- heat layer with fallback ----------
+  var hasHeat=(typeof L.heatLayer==='function');
+  var heat=null, heatCircles=null;
+  if(hasHeat){
+    heat=L.heatLayer([],{radius:55,blur:45,maxZoom:13,max:8,
+      gradient:{0.0:'#3d5a73',0.12:'#4cc9f0',0.35:'#4361ee',0.6:'#7209b7',1.0:'#f72585'}}).addTo(map);
+  }else{
+    // fallback: colored circle markers if the heat plugin failed to load
+    heatCircles=L.layerGroup().addTo(map);
+  }
+  function heatColor(p){
+    if(p<0.1)return'#3d5a73'; if(p<1)return'#4cc9f0';
+    if(p<4)return'#4361ee'; if(p<8)return'#7209b7'; return'#f72585';
+  }
+
+  var vecSvg=document.getElementById('vec');
+
+  function dirLabel(deg){var d=['N','NE','E','SE','S','SO','O','NO'];return d[Math.round((((deg%360)+360)%360)/45)%8];}
+  function windToMove(f){return (f+180)%360;}
+
+  // ---------- fetch (chunked to keep URLs safe) ----------
+  function buildUrl(pts){
+    var lat=pts.map(function(p){return p.lat.toFixed(4);}).join(',');
+    var lon=pts.map(function(p){return p.lon.toFixed(4);}).join(',');
+    return 'https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lon+
+      '&current=precipitation,rain,wind_speed_10m,wind_direction_10m&timezone=America%2FMexico_City';
+  }
+  function normalize(json,offset){
+    // Open-Meteo returns an object for 1 coord, an array for many
+    var arr=Array.isArray(json)?json:[json];
+    return arr.map(function(d,k){
+      var c=(d&&d.current)?d.current:{};
+      return {
+        lat:grid[offset+k].lat, lon:grid[offset+k].lon,
+        precip:Number(c.precipitation!=null?c.precipitation:(c.rain!=null?c.rain:0))||0,
+        wSpeed:Number(c.wind_speed_10m)||0,
+        wDir:Number(c.wind_direction_10m)||0
+      };
+    });
+  }
+  function fetchGrid(){
+    // split into 2 requests of 18 pts to keep URL length modest
+    var mid=Math.ceil(grid.length/2);
+    var a=grid.slice(0,mid), b=grid.slice(mid);
+    return Promise.all([
+      fetch(buildUrl(a)).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}),
+      fetch(buildUrl(b)).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();})
+    ]).then(function(res){
+      return normalize(res[0],0).concat(normalize(res[1],mid));
+    });
+  }
+
+  // ---------- render ----------
+  function renderHeat(pts){
+    if(!pts.length)return;
+    if(heat){
+      heat.setLatLngs(pts.map(function(p){return [p.lat,p.lon,Math.max(p.precip,0.001)];}));
+    }else if(heatCircles){
+      heatCircles.clearLayers();
+      pts.forEach(function(p){
+        L.circleMarker([p.lat,p.lon],{radius:16,stroke:false,
+          fillColor:heatColor(p.precip),fillOpacity:p.precip<0.1?0.15:0.5}).addTo(heatCircles);
+      });
+    }
+  }
+  function renderVectors(pts){
+    var W=vecSvg.clientWidth,H=vecSvg.clientHeight;
+    if(!W||!H||!pts.length){vecSvg.innerHTML='';return;}
+    vecSvg.setAttribute('viewBox','0 0 '+W+' '+H);
+    var maxW=Math.max.apply(null,pts.map(function(p){return p.wSpeed;}).concat(1));
+    var s='<defs><marker id="ah" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">'+
+          '<path d="M0,0 L7,3.5 L0,7 Z" fill="#4cc9f0"/></marker></defs>';
+    pts.forEach(function(p){
+      var pt=map.latLngToContainerPoint([p.lat,p.lon]);
+      var move=windToMove(p.wDir), rad=(move-90)*Math.PI/180;
+      var len=14+(p.wSpeed/maxW)*30;
+      var x2=pt.x+Math.cos(rad)*len, y2=pt.y+Math.sin(rad)*len;
+      var wet=p.precip>0.05;
+      s+='<line x1="'+pt.x.toFixed(1)+'" y1="'+pt.y.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+
+         '" stroke="'+(wet?'#4cc9f0':'#5a7896')+'" stroke-width="2" opacity="'+(wet?0.95:0.35)+
+         '" marker-end="url(#ah)"/>';
+    });
+    vecSvg.innerHTML=s;
+  }
+  function renderStats(pts){
+    if(!pts.length)return;
+    var mx=Math.max.apply(null,pts.map(function(p){return p.precip;}));
+    var wet=pts.filter(function(p){return p.precip>0.05;});
+    var cov=Math.round(100*wet.length/pts.length);
+    var avgW=pts.reduce(function(s,p){return s+p.wSpeed;},0)/pts.length;
+    var sx=0,sy=0;
+    pts.forEach(function(p){var m=windToMove(p.wDir)*Math.PI/180;sx+=Math.cos(m)*p.wSpeed;sy+=Math.sin(m)*p.wSpeed;});
+    var meanMove=(Math.atan2(sy,sx)*180/Math.PI+360)%360;
+    document.getElementById('mMax').innerHTML=mx.toFixed(1)+'<small>mm/h</small>';
+    document.getElementById('mCov').innerHTML=cov+'<small>%</small>';
+    document.getElementById('mDir').textContent=cov>0?dirLabel(meanMove):'—';
+    document.getElementById('mWind').innerHTML=avgW.toFixed(0)+'<small>km/h</small>';
+  }
+
+  // ---------- loop ----------
+  var lastPts=[];
+  function update(){
+    var upd=document.getElementById('upd'); upd.classList.add('on');
+    return fetchGrid().then(function(pts){
+      lastPts=pts;
+      if(document.getElementById('tHeat').checked) renderHeat(pts);
+      if(document.getElementById('tVec').checked) renderVectors(pts);
+      renderStats(pts);
+      var t=new Date();
+      document.getElementById('stamp').textContent=t.toLocaleTimeString('es-MX');
+      setLive('En vivo · '+t.toLocaleTimeString('es-MX'),'');
+      banner.classList.remove('on');
+    }).catch(function(e){
+      setLive('Sin conexión con el radar · reintentando','err');
+      showBanner('No se pudieron obtener datos de Open-Meteo. Se reintentará automáticamente.');
+      console.error('[lluvia] fetch failed:',e);
+    }).then(function(){ setTimeout(function(){upd.classList.remove('on');},400); });
+  }
+
+  map.on('move zoom viewreset',function(){
+    if(document.getElementById('tVec').checked&&lastPts.length) renderVectors(lastPts);
+  });
+
+  document.getElementById('tHeat').onchange=function(e){
+    if(e.target.checked){ if(heat)heat.addTo(map); if(heatCircles)heatCircles.addTo(map); renderHeat(lastPts);}
+    else{ if(heat)map.removeLayer(heat); if(heatCircles)map.removeLayer(heatCircles); }
+  };
+  document.getElementById('tVec').onchange=function(e){
+    vecSvg.style.display=e.target.checked?'block':'none';
+    if(e.target.checked&&lastPts.length) renderVectors(lastPts);
+  };
+  var timer=setInterval(update,REFRESH_MS);
+  document.getElementById('tAuto').onchange=function(e){
+    clearInterval(timer); if(e.target.checked) timer=setInterval(update,REFRESH_MS);
+  };
+
+  if(!hasHeat) showBanner('Plugin de heatmap no disponible: mostrando intensidad con marcadores.');
+  // ensure map sized before first vector render
+  setTimeout(function(){ map.invalidateSize(); update(); },100);
+})();
+</script>
+</body>
+</html>
