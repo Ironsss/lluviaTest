@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a1420">
+<title>Lluvia CDMX</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<style>
+  :root{
+    --bg:#0a1420; --accent:#4cc9f0; --accent2:#5ee0d0;
+    --text:#f2f7fb; --dim:#9fb2c4; --faint:#6b7f92;
+    --glass:rgba(18,28,42,.72); --glass-solid:#121c2a; --hair:rgba(255,255,255,.08);
+    --sys:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Segoe UI",system-ui,sans-serif;
+    --safe-top:env(safe-area-inset-top,0px);
+    --safe-bot:env(safe-area-inset-bottom,0px);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+  body{background:var(--bg);color:var(--text);font-family:var(--sys);
+    font-size:16px;line-height:1.4;-webkit-font-smoothing:antialiased;position:fixed;inset:0}
+
+  #map{position:absolute;inset:0;background:#081018;z-index:1}
+  .leaflet-container{background:#081018;font-family:var(--sys)}
+  .leaflet-control-zoom{display:none} /* usamos controles propios */
+  .radar-tiles{image-rendering:auto}
+  #vec{position:absolute;inset:0;z-index:400;pointer-events:none}
+
+  /* ---------- top bar ---------- */
+  .topbar{position:absolute;top:0;left:0;right:0;z-index:30;
+    padding:calc(var(--safe-top) + 12px) 16px 12px;
+    display:flex;align-items:center;gap:12px;
+    background:linear-gradient(180deg,rgba(10,20,32,.85) 0%,rgba(10,20,32,0) 100%);
+    pointer-events:none}
+  .title-wrap{pointer-events:auto}
+  .title{font-size:19px;font-weight:700;letter-spacing:-.01em;line-height:1;display:flex;align-items:center;gap:7px}
+  .title .live-dot{width:7px;height:7px;border-radius:50%;background:var(--accent);
+    box-shadow:0 0 8px var(--accent);animation:breathe 2.4s ease-in-out infinite}
+  @keyframes breathe{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.82)}}
+  .subtitle{font-size:12px;color:var(--dim);margin-top:3px;font-weight:500;letter-spacing:.01em}
+  .subtitle.err{color:#ffcf5e}
+
+  /* ---------- floating controls (right) ---------- */
+  .fabs{position:absolute;top:calc(var(--safe-top) + 74px);right:14px;z-index:35;
+    display:flex;flex-direction:column;gap:10px}
+  .fab{width:46px;height:46px;border-radius:23px;border:.5px solid var(--hair);
+    background:var(--glass);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);
+    color:var(--text);display:flex;align-items:center;justify-content:center;cursor:pointer;
+    box-shadow:0 4px 16px rgba(0,0,0,.28);transition:transform .15s,background .2s,color .2s;pointer-events:auto}
+  .fab:active{transform:scale(.9)}
+  .fab.active{color:var(--accent);background:rgba(76,201,240,.16);border-color:rgba(76,201,240,.4)}
+  .fab svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .fab.loading svg{animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ---------- timeline (floats above sheet) ---------- */
+  .timeline{position:absolute;left:14px;right:14px;z-index:25;
+    bottom:calc(var(--sheet-peek) + 14px);
+    background:var(--glass);backdrop-filter:blur(22px) saturate(1.5);-webkit-backdrop-filter:blur(22px) saturate(1.5);
+    border:.5px solid var(--hair);border-radius:20px;padding:12px 15px;
+    box-shadow:0 6px 22px rgba(0,0,0,.32);transition:opacity .3s,transform .3s;
+    display:none}
+  .timeline.show{display:block}
+  .tl-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+  .tl-label{font-size:13px;font-weight:600;display:flex;align-items:baseline;gap:7px}
+  .tl-label .tag{font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--bg);background:var(--dim);padding:2px 6px;border-radius:5px}
+  .tl-label .tag.now{background:var(--accent2);color:#062a26}
+  .tl-label b{color:var(--accent);font-variant-numeric:tabular-nums;font-size:15px}
+  .tl-play{width:38px;height:38px;border-radius:19px;border:none;background:var(--accent);color:#04202e;
+    font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:transform .12s}
+  .tl-play:active{transform:scale(.88)}
+  .tl-scrub{-webkit-appearance:none;appearance:none;width:100%;height:5px;border-radius:5px;
+    background:rgba(255,255,255,.16);outline:none}
+  .tl-scrub::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 5px rgba(0,0,0,.4);cursor:pointer}
+  .tl-scrub::-moz-range-thumb{width:17px;height:17px;border:none;border-radius:50%;background:#fff;cursor:pointer}
+  .tl-ticks{display:flex;justify-content:space-between;margin-top:6px;font-size:10px;color:var(--faint);font-variant-numeric:tabular-nums}
+
+  /* ---------- bottom sheet ---------- */
+  :root{--sheet-peek:132px;--sheet-full:74vh}
+  .sheet{position:absolute;left:0;right:0;bottom:0;z-index:40;
+    height:var(--sheet-full);
+    transform:translateY(calc(var(--sheet-full) - var(--sheet-peek)));
+    background:var(--glass);backdrop-filter:blur(30px) saturate(1.5);-webkit-backdrop-filter:blur(30px) saturate(1.5);
+    border-top:.5px solid var(--hair);border-radius:22px 22px 0 0;
+    box-shadow:0 -8px 40px rgba(0,0,0,.4);
+    transition:transform .38s cubic-bezier(.32,.72,0,1);
+    padding-bottom:var(--safe-bot);will-change:transform;touch-action:none}
+  .sheet.open{transform:translateY(0)}
+  .sheet-handle{width:100%;padding:10px 0 6px;display:flex;justify-content:center;cursor:grab}
+  .sheet-handle::before{content:"";width:38px;height:5px;border-radius:3px;background:rgba(255,255,255,.28)}
+  .sheet-scroll{height:calc(var(--sheet-full) - 30px);overflow-y:auto;-webkit-overflow-scrolling:touch;
+    padding:0 20px 20px}
+  .sheet.dragging{transition:none}
+
+  /* peek content: the headline stats always visible */
+  .peek{display:flex;gap:10px;padding:0 4px 16px;border-bottom:.5px solid var(--hair);margin-bottom:16px}
+  .peek-card{flex:1;background:rgba(255,255,255,.05);border-radius:14px;padding:12px 13px}
+  .peek-card .k{font-size:11px;color:var(--dim);font-weight:500;margin-bottom:5px;letter-spacing:.01em}
+  .peek-card .v{font-size:22px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
+  .peek-card .v small{font-size:12px;font-weight:500;color:var(--dim);margin-left:2px}
+  .peek-card .v.accent{color:var(--accent)}
+
+  .sec{margin-bottom:22px}
+  .sec-h{font-size:12px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px}
+
+  .legend{display:flex;flex-direction:column;gap:9px}
+  .legend-row{display:flex;align-items:center;gap:11px;font-size:14px;color:var(--text)}
+  .legend-row .sw{width:30px;height:11px;border-radius:3px;flex-shrink:0}
+  .legend-note{font-size:12px;color:var(--faint);margin-top:10px;line-height:1.5}
+
+  .rows{display:flex;flex-direction:column;gap:2px}
+  .row{display:flex;align-items:center;justify-content:space-between;padding:13px 4px;
+    border-bottom:.5px solid var(--hair)}
+  .row:last-child{border-bottom:none}
+  .row .rl{font-size:15px;font-weight:500}
+  .row .rl small{display:block;font-size:12px;color:var(--faint);font-weight:400;margin-top:2px}
+  /* iOS switch */
+  .sw-tog{position:relative;width:51px;height:31px;flex-shrink:0}
+  .sw-tog input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:2}
+  .sw-tog .track{position:absolute;inset:0;background:rgba(255,255,255,.16);border-radius:16px;transition:background .25s}
+  .sw-tog .track::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;
+    background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.3);transition:transform .25s}
+  .sw-tog input:checked ~ .track{background:var(--accent)}
+  .sw-tog input:checked ~ .track::after{transform:translateX(20px)}
+
+  .arrow-key{display:flex;align-items:center;gap:13px;font-size:13px;color:var(--dim);line-height:1.5}
+  .arrow-key svg{flex-shrink:0}
+
+  .foot{font-size:11px;color:var(--faint);line-height:1.6;padding-top:4px}
+  .foot a{color:var(--dim);text-decoration:none}
+
+  .banner{position:absolute;top:calc(var(--safe-top) + 70px);left:50%;transform:translateX(-50%);z-index:50;
+    background:rgba(58,18,32,.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border:.5px solid rgba(247,37,133,.5);color:#ffd6e6;padding:11px 18px;border-radius:14px;
+    font-size:13px;max-width:88%;text-align:center;display:none;box-shadow:0 4px 20px rgba(0,0,0,.35)}
+  .banner.on{display:block}
+
+  /* user location pulse marker */
+  .user-dot{width:18px;height:18px;border-radius:50%;background:var(--accent);border:2.5px solid #fff;
+    box-shadow:0 0 0 rgba(76,201,240,.5);animation:userpulse 2s infinite}
+  @keyframes userpulse{0%{box-shadow:0 0 0 0 rgba(76,201,240,.5)}70%{box-shadow:0 0 0 16px rgba(76,201,240,0)}100%{box-shadow:0 0 0 0 rgba(76,201,240,0)}}
+
+  @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+  @media (min-width:821px){
+    /* en escritorio: sheet fija abierta como panel lateral */
+    :root{--sheet-full:100vh}
+    .sheet{left:auto;right:0;width:380px;height:100vh;transform:none;border-radius:0;border-left:.5px solid var(--hair);border-top:none}
+    .sheet-handle{display:none}
+    .sheet-scroll{height:100vh;padding-top:calc(var(--safe-top) + 20px)}
+    .timeline{right:calc(380px + 14px)}
+    .fabs{right:calc(380px + 14px)}
+  }
+</style>
+</head>
+<body>
+  <div id="map"></div>
+  <svg id="vec"></svg>
+
+  <div class="topbar">
+    <div class="title-wrap">
+      <div class="title"><span class="live-dot" id="liveDot"></span>Lluvia CDMX</div>
+      <div class="subtitle" id="subtitle">Conectando al radar…</div>
+    </div>
+  </div>
+
+  <div class="fabs">
+    <button class="fab" id="fabLoc" aria-label="Mi ubicación">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3.2M12 18.3v3.2M2.5 12h3.2M18.3 12h3.2"/><circle cx="12" cy="12" r="7.5"/></svg>
+    </button>
+    <button class="fab" id="fabFs" aria-label="Pantalla completa">
+      <svg viewBox="0 0 24 24" id="fsIcon"><path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M20 9V5.5A1.5 1.5 0 0 0 18.5 4H15M4 15v3.5A1.5 1.5 0 0 0 5.5 20H9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15"/></svg>
+    </button>
+  </div>
+
+  <div class="banner" id="banner"></div>
+
+  <div class="timeline" id="timeline">
+    <div class="tl-head">
+      <div class="tl-label"><span class="tag" id="tlTag">Pasado</span><b id="tlTime">—</b></div>
+      <button class="tl-play" id="tlPlay" aria-label="Reproducir">▶</button>
+    </div>
+    <input type="range" class="tl-scrub" id="tlScrub" min="0" max="0" value="0">
+    <div class="tl-ticks"><span id="tlStart">−2 h</span><span>ahora</span><span id="tlEnd">+30 min</span></div>
+  </div>
+
+  <div class="sheet" id="sheet">
+    <div class="sheet-handle" id="sheetHandle"></div>
+    <div class="sheet-scroll" id="sheetScroll">
+      <div class="peek">
+        <div class="peek-card"><div class="k">Frame</div><div class="v accent" id="pFrame">—</div></div>
+        <div class="peek-card"><div class="k">Se mueve a</div><div class="v" id="pDir">—</div></div>
+        <div class="peek-card"><div class="k">Viento</div><div class="v" id="pWind">—<small>km/h</small></div></div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h">Capas</div>
+        <div class="rows">
+          <label class="row"><span class="rl">Radar de lluvia</span>
+            <span class="sw-tog"><input type="checkbox" id="tRadar" checked><span class="track"></span></span></label>
+          <label class="row"><span class="rl">Flecha de dirección<small>Hacia dónde se mueve el sistema</small></span>
+            <span class="sw-tog"><input type="checkbox" id="tVec" checked><span class="track"></span></span></label>
+          <label class="row"><span class="rl">Incluir nowcast<small>Pronóstico a corto plazo</small></span>
+            <span class="sw-tog"><input type="checkbox" id="tNow" checked><span class="track"></span></span></label>
+          <label class="row"><span class="rl">Auto-actualizar<small>Cada 5 minutos</small></span>
+            <span class="sw-tog"><input type="checkbox" id="tAuto" checked><span class="track"></span></span></label>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h">Intensidad</div>
+        <div class="legend">
+          <div class="legend-row"><span class="sw" style="background:#3a8fd6"></span>Ligera</div>
+          <div class="legend-row"><span class="sw" style="background:#3ad6a0"></span>Moderada</div>
+          <div class="legend-row"><span class="sw" style="background:#e8d63a"></span>Fuerte</div>
+          <div class="legend-row"><span class="sw" style="background:#e8853a"></span>Muy fuerte</div>
+          <div class="legend-row"><span class="sw" style="background:#f72585"></span>Torrencial / granizo</div>
+        </div>
+        <div class="legend-note">Tonos fríos = lluvia débil, cálidos = intensa. Escala del radar RainViewer.</div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h">Dirección</div>
+        <div class="arrow-key">
+          <svg width="44" height="24" viewBox="0 0 44 24">
+            <defs><marker id="hk" markerWidth="6" markerHeight="6" refX="4" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#4cc9f0"/></marker></defs>
+            <line x1="4" y1="12" x2="34" y2="12" stroke="#4cc9f0" stroke-width="2.4" marker-end="url(#hk)"/>
+          </svg>
+          <span>La flecha apunta hacia donde se desplaza la lluvia, según el viento a 10 m en el centro de la ciudad.</span>
+        </div>
+      </div>
+
+      <div class="foot">
+        Radar: <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a> · Viento: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a><br>
+        Actualizado <span id="stamp">—</span>
+      </div>
+    </div>
+  </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+"use strict";
+(function(){
+  var $=function(id){return document.getElementById(id);};
+  var banner=$('banner');
+  function showBanner(m){banner.textContent=m;banner.classList.add('on');}
+  function hideBanner(){banner.classList.remove('on');}
+  function setSub(t,err){var s=$('subtitle');s.textContent=t;s.classList.toggle('err',!!err);}
+
+  if(typeof L==='undefined'){showBanner('No se pudo cargar el mapa. Revisa tu conexión y recarga.');setSub('Error de carga',true);return;}
+
+  var CENTER=[19.36,-99.15], REFRESH_MS=300000;
+  var RADAR_API='https://api.rainviewer.com/public/weather-maps.json';
+  var WIND_API='https://api.open-meteo.com/v1/forecast?latitude=19.4326&longitude=-99.1332&current=wind_speed_10m,wind_direction_10m&timezone=America%2FMexico_City';
+  var TILE_SIZE=(window.devicePixelRatio>=2)?512:256;
+  var RADAR_OPACITY=0.45;
+
+  var map=L.map('map',{zoomControl:false,attributionControl:false,minZoom:8,maxZoom:16,zoomSnap:.5}).setView(CENTER,10);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',{maxZoom:20,subdomains:'abcd'}).addTo(map);
+  map.createPane('radarPane');map.getPane('radarPane').style.zIndex=350;map.getPane('radarPane').style.pointerEvents='none';
+  map.createPane('labelPane');map.getPane('labelPane').style.zIndex=360;map.getPane('labelPane').style.pointerEvents='none';
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',{maxZoom:20,subdomains:'abcd',pane:'labelPane'}).addTo(map);
+  map.setMaxBounds([[18.7,-99.9],[20.1,-98.4]]);
+
+  var host='',frames=[],pastCount=0,pos=0,curLayer=null,layerCache={},playing=false,playTimer=null,loading=false;
+  var vecSvg=$('vec'), wind={speed:null,dir:null};
+
+  function dirLabel(d){var a=['N','NE','E','SE','S','SO','O','NO'];return a[Math.round((((d%360)+360)%360)/45)%8];}
+  function windToMove(f){return (f+180)%360;}
+  function fmtTime(ts){return new Date(ts*1000).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});}
+
+  function makeLayer(frame){
+    return new L.TileLayer(host+frame.path+'/'+TILE_SIZE+'/{z}/{x}/{y}/2/1_1.png',
+      {tileSize:256,opacity:0.001,maxNativeZoom:7,maxZoom:16,pane:'radarPane',className:'radar-tiles'});
+  }
+  function clearCache(){for(var p in layerCache){if(parseInt(p)!==pos){map.removeLayer(layerCache[p]);delete layerCache[p];}}}
+  function showFrame(p){
+    if(loading||!frames.length)return;
+    if(p>=frames.length)p=0;if(p<0)p=frames.length-1;
+    var frame=frames[p], isNow=frame.__nowcast;
+    var tag=$('tlTag');tag.textContent=isNow?'Nowcast':'Pasado';tag.classList.toggle('now',isNow);
+    $('tlTime').textContent=fmtTime(frame.time);$('pFrame').textContent=fmtTime(frame.time);
+    $('tlScrub').value=p;
+    var old=curLayer;
+    if(!$('tRadar').checked){if(old)old.setOpacity(0);pos=p;return;}
+    if(layerCache[p]){if(old&&old!==layerCache[p])old.setOpacity(0);layerCache[p].setOpacity(RADAR_OPACITY);curLayer=layerCache[p];pos=p;
+      if(playing)playTimer=setTimeout(function(){showFrame(pos+1);},520);return;}
+    loading=true;var nl=makeLayer(frame);
+    nl.on('load',function(){nl.setOpacity(RADAR_OPACITY);if(old)old.setOpacity(0);layerCache[p]=nl;curLayer=nl;pos=p;loading=false;
+      if(playing)playTimer=setTimeout(function(){showFrame(pos+1);},520);});
+    nl.on('tileerror',function(){loading=false;});
+    nl.addTo(map);
+  }
+  function stop(){if(playTimer){clearTimeout(playTimer);playTimer=null;}playing=false;$('tlPlay').innerHTML='▶';}
+  function play(){if(!frames.length)return;playing=true;$('tlPlay').innerHTML='❚❚';showFrame(pos+1);}
+
+  function renderVector(){
+    vecSvg.innerHTML='';
+    if(!$('tVec').checked||wind.dir==null)return;
+    var W=vecSvg.clientWidth,H=vecSvg.clientHeight;if(!W||!H)return;
+    vecSvg.setAttribute('viewBox','0 0 '+W+' '+H);
+    var pt=map.latLngToContainerPoint([19.4326,-99.1332]);
+    var move=windToMove(wind.dir),rad=(move-90)*Math.PI/180,len=42+Math.min(wind.speed||0,60);
+    var x2=pt.x+Math.cos(rad)*len,y2=pt.y+Math.sin(rad)*len;
+    vecSvg.innerHTML='<defs><marker id="ah" markerWidth="8" markerHeight="8" refX="5" refY="4" orient="auto">'+
+      '<path d="M0,0 L8,4 L0,8 Z" fill="#4cc9f0"/></marker></defs>'+
+      '<circle cx="'+pt.x+'" cy="'+pt.y+'" r="5" fill="#4cc9f0" opacity="0.9"/>'+
+      '<line x1="'+pt.x+'" y1="'+pt.y+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+
+      '" stroke="#4cc9f0" stroke-width="3.2" opacity="0.95" marker-end="url(#ah)" style="filter:drop-shadow(0 0 5px rgba(76,201,240,.6))"/>';
+  }
+
+  function loadRadar(){
+    return fetch(RADAR_API).then(function(r){if(!r.ok)throw new Error('radar HTTP '+r.status);return r.json();})
+    .then(function(api){
+      if(!api||!api.radar||!api.radar.past)throw new Error('radar sin frames');
+      host=api.host;
+      var past=api.radar.past.map(function(f){f.__nowcast=false;return f;});
+      var now=($('tNow').checked&&api.radar.nowcast)?api.radar.nowcast.map(function(f){f.__nowcast=true;return f;}):[];
+      pastCount=past.length; frames=past.concat(now);
+      clearCache();layerCache={};curLayer=null;
+      $('tlScrub').max=frames.length-1;$('timeline').classList.add('show');
+      if(past.length)$('tlStart').textContent=fmtTime(past[0].time);
+      if(now.length)$('tlEnd').textContent=fmtTime(now[now.length-1].time); else $('tlEnd').textContent='ahora';
+      pos=Math.max(0,past.length-1);showFrame(pos);
+    });
+  }
+  function loadWind(){
+    return fetch(WIND_API).then(function(r){if(!r.ok)throw new Error('viento HTTP '+r.status);return r.json();})
+    .then(function(j){
+      if(j&&j.error)throw new Error(j.reason||'viento error');
+      var c=(j&&j.current)?j.current:{};
+      wind.speed=Number(c.wind_speed_10m)||0;wind.dir=Number(c.wind_direction_10m);
+      $('pWind').innerHTML=(wind.speed).toFixed(0)+'<small>km/h</small>';
+      $('pDir').textContent=(wind.dir!=null)?dirLabel(windToMove(wind.dir)):'—';
+      renderVector();
+    }).catch(function(e){$('pWind').textContent='n/d';$('pDir').textContent='n/d';console.warn('[lluvia] viento:',e.message);});
+  }
+  function update(){
+    return loadRadar().then(function(){
+      setSub('En vivo · actualizado '+new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}));
+      $('stamp').textContent=new Date().toLocaleTimeString('es-MX');hideBanner();return loadWind();
+    }).catch(function(e){setSub('Radar no disponible · reintentando',true);showBanner('No se pudo cargar el radar. Se reintentará en un momento.');console.error('[lluvia]',e);});
+  }
+
+  // ---- timeline controls ----
+  $('tlPlay').onclick=function(){playing?stop():play();};
+  $('tlScrub').oninput=function(e){stop();showFrame(parseInt(e.target.value,10));};
+  $('tRadar').onchange=function(e){if(!e.target.checked){if(curLayer)curLayer.setOpacity(0);}else showFrame(pos);};
+  $('tVec').onchange=renderVector;
+  $('tNow').onchange=function(){stop();loadRadar();};
+  var timer=setInterval(update,REFRESH_MS);
+  $('tAuto').onchange=function(e){clearInterval(timer);if(e.target.checked)timer=setInterval(update,REFRESH_MS);};
+  map.on('movestart',function(){stop();});
+  map.on('move zoom viewreset',renderVector);
+
+  // ---- location ----
+  var userMk=null,userCr=null;
+  $('fabLoc').onclick=function(){
+    var btn=this;
+    if(!navigator.geolocation){showBanner('Tu navegador no permite ubicación.');return;}
+    btn.classList.add('loading');
+    navigator.geolocation.getCurrentPosition(function(p){
+      var lat=p.coords.latitude,lon=p.coords.longitude,acc=p.coords.accuracy||400;
+      if(userMk){map.removeLayer(userMk);map.removeLayer(userCr);}
+      userCr=L.circle([lat,lon],{radius:acc,color:'#4cc9f0',weight:1,fillColor:'#4cc9f0',fillOpacity:0.1}).addTo(map);
+      userMk=L.marker([lat,lon],{icon:L.divIcon({className:'',html:'<div class="user-dot"></div>',iconSize:[18,18],iconAnchor:[9,9]})}).addTo(map);
+      map.flyTo([lat,lon],13,{duration:.8});
+      btn.classList.remove('loading');btn.classList.add('active');setTimeout(function(){btn.classList.remove('active');},1500);
+      renderVector();hideBanner();
+    },function(err){btn.classList.remove('loading');
+      showBanner(err.code===1?'Permiso de ubicación denegado. Actívalo en Ajustes → Safari.':'No se pudo obtener tu ubicación.');
+    },{enableHighAccuracy:true,timeout:10000,maximumAge:60000});
+  };
+
+  // ---- fullscreen ----
+  var fsIn='<path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M20 9V5.5A1.5 1.5 0 0 0 18.5 4H15M4 15v3.5A1.5 1.5 0 0 0 5.5 20H9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15"/>';
+  var fsOut='<path d="M9 4.5V8A1.5 1.5 0 0 1 7.5 9.5H4M15 4.5V8a1.5 1.5 0 0 0 1.5 1.5H20M9 19.5V16a1.5 1.5 0 0 0-1.5-1.5H4M15 19.5V16a1.5 1.5 0 0 1 1.5-1.5H20"/>';
+  $('fabFs').onclick=function(){
+    var el=document.documentElement,isFs=document.fullscreenElement||document.webkitFullscreenElement;
+    if(!isFs){if(el.requestFullscreen)el.requestFullscreen().catch(fsFallback);else if(el.webkitRequestFullscreen)el.webkitRequestFullscreen();else fsFallback();}
+    else{if(document.exitFullscreen)document.exitFullscreen();else if(document.webkitExitFullscreen)document.webkitExitFullscreen();else fsFallback();}
+    setTimeout(function(){map.invalidateSize();renderVector();},300);
+  };
+  function fsFallback(){/* iOS: colapsa el sheet para maximizar el mapa */ closeSheet();var b=$('fabFs');b.classList.toggle('active');$('fsIcon').innerHTML=b.classList.contains('active')?fsOut:fsIn;setTimeout(function(){map.invalidateSize();renderVector();},260);}
+  document.addEventListener('fullscreenchange',function(){var on=!!document.fullscreenElement;$('fabFs').classList.toggle('active',on);$('fsIcon').innerHTML=on?fsOut:fsIn;setTimeout(function(){map.invalidateSize();renderVector();},260);});
+
+  // ---- bottom sheet drag ----
+  var sheet=$('sheet'),handle=$('sheetHandle'),scroll=$('sheetScroll');
+  var open=false,startY=0,startT=0,dragging=false;
+  var FULL=0,PEEK=0;
+  function measure(){FULL=sheet.offsetHeight;PEEK=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sheet-peek'));}
+  function setT(y){sheet.style.transform='translateY('+y+'px)';}
+  function openSheet(){open=true;sheet.classList.add('open');sheet.style.transform='';}
+  function closeSheet(){open=false;sheet.classList.remove('open');sheet.style.transform='';}
+  function onStart(e){if(window.innerWidth>820)return;var y=(e.touches?e.touches[0].clientY:e.clientY);
+    // permitir arrastre desde el handle siempre; desde el scroll solo si esta arriba del todo
+    if(e.target!==handle && !handle.contains(e.target)){ if(open && scroll.scrollTop>0) return; }
+    measure();dragging=true;startY=y;startT=open?0:(FULL-PEEK);sheet.classList.add('dragging');}
+  function onMove(e){if(!dragging)return;var y=(e.touches?e.touches[0].clientY:e.clientY);var dy=y-startY;
+    var t=Math.max(0,Math.min(FULL-PEEK,startT+dy));setT(t);if(e.cancelable)e.preventDefault();}
+  function onEnd(){if(!dragging)return;dragging=false;sheet.classList.remove('dragging');
+    var m=/translateY\(([\d.]+)px\)/.exec(sheet.style.transform);var cur=m?parseFloat(m[1]):(open?0:FULL-PEEK);
+    var mid=(FULL-PEEK)/2; if(cur<mid)openSheet();else closeSheet();}
+  handle.addEventListener('touchstart',onStart,{passive:true});
+  scroll.addEventListener('touchstart',onStart,{passive:true});
+  window.addEventListener('touchmove',onMove,{passive:false});
+  window.addEventListener('touchend',onEnd);
+  handle.addEventListener('click',function(){open?closeSheet():openSheet();});
+
+  window.addEventListener('resize',function(){setTimeout(function(){map.invalidateSize();renderVector();},150);});
+  setTimeout(function(){map.invalidateSize();update();},100);
+})();
+</script>
+</body>
+</html>
