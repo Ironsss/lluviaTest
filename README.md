@@ -2,7 +2,7 @@
 
 Dashboard interactivo de **precipitación en tiempo real** para la Ciudad de México. Muestra un radar de lluvia animable sobre las 16 alcaldías, con dirección del sistema, geolocalización y una interfaz estilo iOS nativo. Todo en un solo archivo HTML, sin build, sin dependencias que instalar y sin API keys.
 
-**Demo:** https://ironsss.github.io/IluviaTest/
+**Demo:** https://ironsss.github.io/lluviaTest/
 
 ![Estado](https://img.shields.io/badge/estado-en%20vivo-4cc9f0) ![Sin API key](https://img.shields.io/badge/API%20key-no%20requerida-3ad6a0) ![Licencia](https://img.shields.io/badge/licencia-MIT-blue)
 
