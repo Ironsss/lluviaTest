@@ -196,7 +196,7 @@
       <div class="peek">
         <div class="peek-card"><div class="k">Frame</div><div class="v accent" id="pFrame">—</div></div>
         <div class="peek-card"><div class="k">Se mueve a</div><div class="v" id="pDir">—</div></div>
-        <div class="peek-card"><div class="k">Viento</div><div class="v" id="pWind">—<small>km/h</small></div></div>
+        <div class="peek-card"><div class="k">Fuente</div><div class="v" id="pSource">Radar</div></div>
       </div>
 
       <div class="sec">
@@ -232,12 +232,12 @@
             <defs><marker id="hk" markerWidth="6" markerHeight="6" refX="4" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#4cc9f0"/></marker></defs>
             <line x1="4" y1="12" x2="34" y2="12" stroke="#4cc9f0" stroke-width="2.4" marker-end="url(#hk)"/>
           </svg>
-          <span>Campo vectorial: combina el viento a 10 m (malla) con la advección observada del radar (flujo óptico entre frames). El largo y color de cada flecha crecen con la velocidad de desplazamiento.</span>
+          <span>Flujo estimado a partir del desplazamiento observado entre los dos frames más recientes del radar. Es una referencia visual, no una medición de viento.</span>
         </div>
       </div>
 
       <div class="foot">
-        Radar: <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a> · Viento: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a><br>
+        Radar: <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a> · Mapa: <a href="https://carto.com/" target="_blank" rel="noopener">CARTO</a><br>
         Actualizado <span id="stamp">—</span>
       </div>
     </div>
@@ -257,18 +257,6 @@
 
   var CENTER=[19.36,-99.15], REFRESH_MS=300000;
   var RADAR_API='https://api.rainviewer.com/public/weather-maps.json';
-  // malla de viento 5x6 sobre CDMX en UNA sola peticion multi-coordenada (dentro de cuota)
-  var WGRID=(function(){
-    var latN=19.59,latS=19.10,lonW=-99.35,lonE=-98.95,nx=5,ny=6,g=[];
-    for(var j=0;j<ny;j++)for(var i=0;i<nx;i++)g.push({lat:latS+(latN-latS)*(j/(ny-1)),lon:lonW+(lonE-lonW)*(i/(nx-1))});
-    return g;
-  })();
-  var WIND_API=(function(){
-    var lat=WGRID.map(function(p){return p.lat.toFixed(4);}).join(',');
-    var lon=WGRID.map(function(p){return p.lon.toFixed(4);}).join(',');
-    return 'https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lon+
-      '&current=wind_speed_10m,wind_direction_10m&timezone=America%2FMexico_City';
-  })();
   var TILE_SIZE=(window.devicePixelRatio>=2)?512:256;
   var RADAR_OPACITY=0.45;
 
@@ -283,12 +271,9 @@
 
   var host='',frames=[],pastCount=0,pos=0,curLayer=null,layerCache={},playing=false,playTimer=null,loading=false;
   var vecCanvas=$('vec'), vctx=vecCanvas.getContext('2d');
-  var windGrid=[];        // [{lat,lon,u,v,speed,dir}] viento de fondo
   var advection=null;     // {u,v} adveccion media del radar (px->km/h aprox) en coords geo
-  var meanWind={speed:null,dir:null};
 
   function dirLabel(d){var a=['N','NE','E','SE','S','SO','O','NO'];return a[Math.round((((d%360)+360)%360)/45)%8];}
-  function windToMove(f){return (f+180)%360;}
   function fmtTime(ts){return new Date(ts*1000).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});}
 
   function makeLayer(frame){
@@ -317,9 +302,8 @@
   function play(){if(!frames.length)return;playing=true;$('tlPlay').innerHTML='❚❚';showFrame(pos+1);}
 
   // ============ CAMPO VECTORIAL FORMAL ============
-  // Componente 1: viento de fondo (malla Open-Meteo, interpolado bilinealmente)
-  // Componente 2: advección del radar (flujo óptico entre 2 frames)
-  // Vector final por nodo = w1*viento_local + w2*adveccion
+  // La dirección se estima exclusivamente con la advección observada del radar.
+  // Así la vista general no depende de una API meteorológica adicional.
 
   // --- intensidad escalar desde el color del radar (via hue), validada ---
   function rgb2hue(r,g,b){r/=255;g/=255;b/=255;var mx=Math.max(r,g,b),mn=Math.min(r,g,b),d=mx-mn;
@@ -377,10 +361,13 @@
   // --- calcular adveccion media del radar entre los 2 ultimos frames de pasado ---
   function computeAdvection(){
     advection=null;
-    if(pastCount<2)return Promise.resolve();
+    $('pDir').textContent='n/d';
+    $('pSource').textContent='Analizando';
+    if(pastCount<2){$('pSource').textContent='Sin datos';return Promise.resolve();}
     var fA=frames[pastCount-2], fB=frames[pastCount-1];
     return Promise.all([sampleFrameField(fA),sampleFrameField(fB)]).then(function(r){
-      var prev=r[0],cur=r[1]; if(!prev||!cur)return;
+      var prev=r[0],cur=r[1];
+      if(!prev||!cur){$('pSource').textContent='Sin datos';return;}
       // solo considerar bloques con lluvia significativa
       var sumU=0,sumV=0,wsum=0,bs=6,search=5;
       for(var by=0;by<=GS-bs;by+=3)for(var bx=0;bx<=GS-bs;bx+=3){
@@ -393,29 +380,21 @@
       if(wsum>0){
         // dx,dy en celdas GS por ~10 min entre frames. Convertir a vector de rumbo.
         advection={u:sumU/wsum, v:sumV/wsum, conf:Math.min(1,wsum/50)};
+        // dx positivo = este; dy positivo = sur. Convertir a rumbo (0° norte).
+        $('pDir').textContent=dirLabel((Math.atan2(advection.u,-advection.v)*180/Math.PI+360)%360);
+        $('pSource').textContent='Radar';
+      }else{
+        $('pDir').textContent='n/d';
+        $('pSource').textContent='Sin lluvia';
       }
     });
-  }
-
-  // --- interpolar viento de la malla al punto (lat,lon) ---
-  function windAt(lat,lon){
-    if(!windGrid.length)return null;
-    // vecino mas cercano ponderado por distancia inversa (IDW, k=4)
-    var acc=windGrid.map(function(p){var d=(p.lat-lat)*(p.lat-lat)+(p.lon-lon)*(p.lon-lon);return {p:p,d:d};})
-      .sort(function(a,b){return a.d-b.d;}).slice(0,4);
-    var su=0,sv=0,sw=0;
-    acc.forEach(function(o){var w=1/(o.d+1e-6);su+=o.p.u*w;sv+=o.p.v*w;sw+=w;});
-    return {u:su/sw, v:sv/sw};
   }
 
   // --- evaluar el campo vectorial en un punto de PANTALLA (px,py) -> vector en px/frame ---
   var fieldAdvScale=3.2;
   function fieldAtScreen(px,py){
-    var ll=map.containerPointToLatLng([px,py]);
-    var w=windAt(ll.lat,ll.lng);
-    if(!w&&!advection)return null;
-    var vx=w?w.u:0, vy=w?-w.v:0;                 // viento (v norte -> pantalla invierte)
-    if(advection){ vx+=advection.u*fieldAdvScale; vy+=advection.v*fieldAdvScale; }
+    if(!advection)return null;
+    var vx=advection.u*fieldAdvScale, vy=advection.v*fieldAdvScale;
     return {vx:vx,vy:vy,mag:Math.sqrt(vx*vx+vy*vy)};
   }
 
@@ -466,14 +445,14 @@
     }
   }
   function animate(){
-    if($('tVec').checked && (windGrid.length||advection)){ stepParticles(); }
+    if($('tVec').checked && advection){ stepParticles(); }
     rafId=requestAnimationFrame(animate);
   }
   function clearVec(){var w=vecCanvas.clientWidth,h=vecCanvas.clientHeight;vctx.clearRect(0,0,w,h);}
   // renderVector: recalcula/limpia el campo (se llama al cambiar frame, mover mapa, cargar datos)
   function renderVector(){
     if(!$('tVec').checked){clearVec();return;}
-    // el campo cambia (nuevo frame o viento): las particulas ya lo leen en vivo via fieldAtScreen.
+    // El campo cambia con cada radar nuevo; las partículas lo leen en vivo vía fieldAtScreen.
     // solo aseguramos canvas dimensionado.
     if(vecCanvas.width===0)resizeVec();
   }
@@ -493,38 +472,11 @@
       pos=Math.max(0,past.length-1);showFrame(pos);
     });
   }
-  function loadWind(){
-    return fetch(WIND_API).then(function(r){if(!r.ok)throw new Error('viento HTTP '+r.status);return r.json();})
-    .then(function(j){
-      if(j&&j.error)throw new Error(j.reason||'viento error');
-      var arr=Array.isArray(j)?j:[j];
-      windGrid=arr.map(function(d,k){
-        var c=(d&&d.current)?d.current:{};
-        var sp=Number(c.wind_speed_10m)||0, dir=Number(c.wind_direction_10m)||0;
-        // viento "desde" dir -> vector de movimiento "hacia" (dir+180). u=este, v=norte.
-        var moveRad=(windToMove(dir))*Math.PI/180;
-        // meteorologico: dir es de donde viene; componentes del movimiento:
-        var u=sp*Math.sin(moveRad), v=sp*Math.cos(moveRad);
-        return {lat:WGRID[k].lat,lon:WGRID[k].lon,speed:sp,dir:dir,u:u,v:v};
-      });
-      // viento medio para el panel
-      var su=0,sv=0;windGrid.forEach(function(p){su+=p.u;sv+=p.v;});
-      su/=windGrid.length;sv/=windGrid.length;
-      meanWind.speed=Math.sqrt(su*su+sv*sv);
-      var moveDeg=(Math.atan2(su,sv)*180/Math.PI+360)%360;
-      meanWind.dir=moveDeg;
-      $('pWind').innerHTML=(meanWind.speed).toFixed(0)+'<small>km/h</small>';
-      $('pDir').textContent=dirLabel(moveDeg);
-      renderVector();
-    }).catch(function(e){$('pWind').textContent='n/d';$('pDir').textContent='n/d';console.warn('[lluvia] viento:',e.message);});
-  }
   function update(){
     return loadRadar().then(function(){
       setSub('En vivo · actualizado '+new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}));
       $('stamp').textContent=new Date().toLocaleTimeString('es-MX');hideBanner();
-      // adveccion del radar (flujo optico) en paralelo con el viento
-      computeAdvection().then(renderVector);
-      return loadWind();
+      return computeAdvection().then(renderVector);
     }).catch(function(e){setSub('Radar no disponible · reintentando',true);showBanner('No se pudo cargar el radar. Se reintentará en un momento.');console.error('[lluvia]',e);});
   }
 
