@@ -12,11 +12,11 @@ Dashboard interactivo de **precipitación en tiempo real** para la Ciudad de Mé
 
 - **Radar de lluvia real** — reflectividad de precipitación de RainViewer, la misma que usan apps meteorológicas profesionales, refrescada cada 5 minutos.
 - **Línea de tiempo animable** — reproduce las últimas 2 horas de lluvia y frames de *nowcast* (pronóstico a corto plazo) para ver hacia dónde se mueve el sistema.
-- **Campo vectorial de dirección** — una flecha que apunta hacia dónde se desplaza la lluvia, calculada a partir del viento a 10 m en el centro de la ciudad.
+- **Campo vectorial de dirección** — estima hacia dónde se desplaza la lluvia mediante flujo óptico entre los dos frames de radar más recientes.
 - **Mi ubicación** — botón de geolocalización con marcador "estás aquí" y círculo de precisión, para saber si te va a llover encima ahora mismo.
 - **Interfaz móvil-first** — mapa a pantalla completa con *bottom sheet* deslizable, glassmorphism sutil y switches estilo iOS. Respeta el notch y la barra inferior del iPhone.
 - **Modo pantalla completa** y capas conmutables (radar, flecha, nowcast, auto-actualización).
-- **Tolerante a fallos** — si el viento no está disponible, el radar sigue funcionando; los errores de red se reintentan automáticamente.
+- **Tolerante a fallos** — los errores de red muestran un estado claro y el radar se reintenta automáticamente.
 
 ---
 
@@ -32,7 +32,7 @@ El dashboard combina tres fuentes de datos en un mapa de [Leaflet](https://leafl
 ├─────────────────────────────────────────────┤
 │  Mapa base oscuro sin etiquetas (CARTO)      │  ← fondo
 └─────────────────────────────────────────────┘
-      + flecha de dirección (SVG, viento Open-Meteo)
+      + flujo de dirección (canvas, desplazamiento observado por radar)
 ```
 
 El radar se sirve como **tiles de imagen** (una sola petición ligera por refresco), lo que evita por completo los límites de cuota que aparecen al muestrear precipitación punto por punto sobre una malla.
@@ -46,15 +46,13 @@ Todas gratuitas y sin API key para uso personal/educativo.
 | Fuente | Endpoint | Uso | Frecuencia |
 |---|---|---|---|
 | **RainViewer** | `api.rainviewer.com/public/weather-maps.json` | Radar de lluvia (capa principal + timeline) | 1 petición / 5 min |
-| **Open-Meteo** | `api.open-meteo.com/v1/forecast` | Viento a 10 m (flecha de dirección) | 1 petición / 5 min |
 | **CARTO Basemaps** | `basemaps.cartocdn.com` | Tiles del mapa base y etiquetas | Bajo demanda (pan/zoom) |
 | **Geolocation API** | `navigator.geolocation` | Ubicación del usuario (local del dispositivo) | Al tocar el botón |
 
 ### Notas sobre las APIs
 
 - **RainViewer** ofrece resolución nativa hasta el nivel de zoom ~7 (≈1 km por celda). Al acercar más, la lluvia se ve suavizada — es normal en cualquier radar meteorológico.
-- **Open-Meteo** en su tier gratuito limita a ~10 000 llamadas/día, 600/min por IP. Como GitHub Pages y las redes móviles usan IPs compartidas, esa cuota puede agotarse; por eso el viento es una fuente *secundaria* y su fallo no rompe el radar.
-- El viento se consulta en **un solo punto** (centro de CDMX) para minimizar el consumo.
+- La dirección se calcula localmente en el navegador comparando los dos frames más recientes; no requiere otra API ni una clave.
 
 ---
 
@@ -115,7 +113,7 @@ python3 -m http.server 8000
 ## Limitaciones conocidas
 
 - El radar de RainViewer depende de la disponibilidad de los datos de origen; RainViewer no garantiza continuidad.
-- La flecha de dirección refleja el viento del **centro** de la ciudad, no un campo por celda (RainViewer no expone viento). Para una malla completa de vectores haría falta volver a Open-Meteo con API key propia.
+- La dirección es una estimación visual del desplazamiento de la precipitación, no una medición de viento ni un pronóstico. Si no hay suficiente lluvia entre frames, aparece como no disponible.
 - La resolución del radar es meteorológica (~1 km), no calle por calle. Las calles del mapa base sí se ven nítidas a cualquier zoom.
 
 ---
@@ -125,7 +123,6 @@ python3 -m http.server 8000
 Este proyecto usa datos de terceros bajo sus respectivas licencias:
 
 - **Radar:** [RainViewer](https://www.rainviewer.com/) — uso personal y educativo. Se requiere mencionar la fuente con enlace.
-- **Viento:** [Open-Meteo](https://open-meteo.com/) — datos bajo [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 - **Mapa base:** [CARTO](https://carto.com/) y [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors.
 
 El código de este repositorio se publica bajo licencia **MIT** (ver `LICENSE`).
