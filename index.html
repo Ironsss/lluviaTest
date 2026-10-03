@@ -237,7 +237,7 @@
       </div>
 
       <div class="foot">
-        Radar: <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a> · Mapa: <a href="https://carto.com/" target="_blank" rel="noopener">CARTO</a><br>
+        Radar: <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a> · Mapa: <a href="https://www.esri.com/" target="_blank" rel="noopener">Esri</a><br>
         Actualizado <span id="stamp">—</span>
       </div>
     </div>
@@ -261,12 +261,12 @@
   var RADAR_OPACITY=0.45;
 
   var map=L.map('map',{zoomControl:false,attributionControl:false,minZoom:8,maxZoom:16,zoomSnap:.5}).setView(CENTER,10);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',{maxZoom:20,subdomains:'abcd'}).addTo(map);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',{maxZoom:16,maxNativeZoom:16}).addTo(map);
   map.createPane('radarPane');map.getPane('radarPane').style.zIndex=350;map.getPane('radarPane').style.pointerEvents='none';
   // blur muy sutil: difumina las fronteras cuadradas entre celdas del radar sin perder forma
   map.getPane('radarPane').style.filter='blur(1.5px)';
   map.createPane('labelPane');map.getPane('labelPane').style.zIndex=360;map.getPane('labelPane').style.pointerEvents='none';
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png',{maxZoom:20,subdomains:'abcd',pane:'labelPane'}).addTo(map);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',{maxZoom:16,maxNativeZoom:16,pane:'labelPane'}).addTo(map);
   map.setMaxBounds([[18.7,-99.9],[20.1,-98.4]]);
 
   var host='',frames=[],pastCount=0,pos=0,curLayer=null,layerCache={},playing=false,playTimer=null,loading=false;
