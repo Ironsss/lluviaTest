@@ -49,7 +49,7 @@ Todas gratuitas y sin API key para uso personal/educativo.
 |---|---|---|---|
 | **RainViewer** | `api.rainviewer.com/public/weather-maps.json` | Radar de lluvia (capa principal + timeline) | 1 petición / 5 min |
 | **Esri Dark Gray** | `server.arcgisonline.com` | Tiles del mapa base y etiquetas | Bajo demanda (pan/zoom) |
-| **Photon** (OpenStreetMap) | `photon.komoot.io` (respaldo: `nominatim.openstreetmap.org`) | Búsqueda de lugares con sugerencias | Al escribir (con pausa de 280 ms) |
+| **Esri World Geocoder** | `geocode.arcgis.com` (respaldos: `photon.komoot.io`, `nominatim.openstreetmap.org`) | Búsqueda de lugares y direcciones con sugerencias | Al escribir (con pausa de 280 ms) |
 | **OSRM** (FOSSGIS) | `routing.openstreetmap.de` | Ruta real por calles a pie / bici / auto | 1 petición por ruta |
 | **Geolocation API** | `navigator.geolocation` | Ubicación del usuario (local del dispositivo) | Al tocar el botón |
 

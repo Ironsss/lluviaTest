@@ -836,19 +836,51 @@
     return {main:main,sub:sub};
   }
   function uniq(list){var seen={};return list.filter(function(s){var k=s.main+'|'+s.sub;if(seen[k])return false;seen[k]=1;return true;});}
-  function geoSearch(q,signal){
+  // Esri World Geocoder (sin key, uso anonimo de suggest/candidates): mejor cobertura de calles y numeros en Mexico
+  var ESRI='https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/';
+  var ESRI_EXT='-99.9,18.7,-98.4,20.1';
+  function esriSuggest(q,cat,signal){
+    var url=ESRI+'suggest?f=json&maxSuggestions=6&countryCode=MX&searchExtent='+ESRI_EXT+'&location=-99.1332,19.4326&text='+encodeURIComponent(q)+(cat?'&category='+cat:'');
+    return fetch(url,{signal:signal}).then(function(r){if(!r.ok)throw new Error('esri '+r.status);return r.json();}).then(function(j){
+      if(j.error)throw new Error('esri '+j.error.code);
+      return (j.suggestions||[]).filter(function(x){return !x.isCollection;}).map(function(x){
+        var parts=x.text.split(', ').filter(function(t){return t!=='MEX'&&!/^\d{5}$/.test(t);});
+        return {main:parts[0],sub:parts.slice(1,4).join(', '),key:x.magicKey,text:x.text};
+      });
+    });
+  }
+  function esriResolve(s){
+    var url=ESRI+'findAddressCandidates?f=json&maxLocations=1&outSR=4326&magicKey='+encodeURIComponent(s.key)+'&SingleLine='+encodeURIComponent(s.text);
+    return fetch(url).then(function(r){return r.json();}).then(function(j){
+      var c=j.candidates&&j.candidates[0];if(!c)throw new Error('sin candidato');
+      return {lat:c.location.y,lon:c.location.x};
+    });
+  }
+  function photonSearch(q,signal){
     var url=PHOTON+'api/?q='+encodeURIComponent(q)+'&limit=6&lat=19.4326&lon=-99.1332&bbox=-99.9,18.7,-98.4,20.1';
     return fetch(url,{signal:signal}).then(function(r){if(!r.ok)throw new Error('geo '+r.status);return r.json();}).then(function(j){
       return uniq((j.features||[]).map(function(f){var l=placeLabel(f.properties||{});
         return {main:l.main,sub:l.sub,lat:f.geometry.coordinates[1],lon:f.geometry.coordinates[0]};}));
+    });
+  }
+  function nominatimSearch(q,signal){
+    var u2='https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6&accept-language=es&countrycodes=mx&viewbox=-99.9,20.1,-98.4,18.7&bounded=1&q='+encodeURIComponent(q);
+    return fetch(u2,{signal:signal}).then(function(r){if(!r.ok)throw new Error('geo2 '+r.status);return r.json();}).then(function(arr){
+      return uniq(arr.map(function(it){var a=it.address||{},parts=(it.display_name||'').split(', ');
+        return {main:it.name||parts[0],sub:[a.road,a.suburb||a.neighbourhood,a.city||a.town||a.state].filter(Boolean).join(', '),lat:parseFloat(it.lat),lon:parseFloat(it.lon)};}));
+    });
+  }
+  // cadena: Esri -> Photon -> Nominatim. Si el texto trae numero (direccion) se priorizan resultados de tipo direccion.
+  function geoSearch(q,signal){
+    var hasNum=/\d/.test(q);
+    var esri=hasNum?Promise.all([esriSuggest(q,'Address',signal),esriSuggest(q,null,signal).catch(function(){return [];})]).then(function(r){
+        return uniq(r[0].concat(r[1])).slice(0,6);}):esriSuggest(q,null,signal);
+    return esri.then(function(l){if(!l.length)throw new Error('esri vacio');return l;}).catch(function(e){
+      if(e&&e.name==='AbortError')throw e;
+      return photonSearch(q,signal).then(function(l){if(!l.length)throw new Error('photon vacio');return l;});
     }).catch(function(e){
       if(e&&e.name==='AbortError')throw e;
-      // respaldo: Nominatim (OpenStreetMap), en espanol
-      var u2='https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6&accept-language=es&countrycodes=mx&viewbox=-99.9,20.1,-98.4,18.7&bounded=1&q='+encodeURIComponent(q);
-      return fetch(u2,{signal:signal}).then(function(r){if(!r.ok)throw new Error('geo2 '+r.status);return r.json();}).then(function(arr){
-        return uniq(arr.map(function(it){var a=it.address||{},parts=(it.display_name||'').split(', ');
-          return {main:it.name||parts[0],sub:[a.road,a.suburb||a.neighbourhood,a.city||a.town||a.state].filter(Boolean).join(', '),lat:parseFloat(it.lat),lon:parseFloat(it.lon)};}));
-      });
+      return nominatimSearch(q,signal);
     });
   }
   function reverseLabel(lat,lon){
@@ -868,7 +900,13 @@
   function showSug(w,list,msg){
     var sg=rtF[w].sug;sg.textContent='';
     if(w==='a')addSug('a','Mi ubicación','Usar tu posición actual','me',useMyLocation);
-    list.forEach(function(s){addSug(w,s.main,s.sub,'',function(){rtSetPoint(w,s.lat,s.lon,s.main);});});
+    list.forEach(function(s){addSug(w,s.main,s.sub,'',function(){
+      var label=s.key?(s.main+(s.sub?', '+s.sub.split(', ')[0]:'')):s.main;
+      if(!s.key){rtSetPoint(w,s.lat,s.lon,label);return;}
+      rtF[w].inp.value=label;hideSug(w);rtF[w].inp.blur();
+      esriResolve(s).then(function(pt){rtSetPoint(w,pt.lat,pt.lon,label);})
+        .catch(function(){showBanner('No se pudo ubicar ese lugar. Intenta con otra sugerencia o usa el pin del mapa.');});
+    });});
     if(msg){var m=el('div','rt-s empty',msg);sg.appendChild(m);}
     sg.classList.toggle('on',sg.childNodes.length>0);
   }
