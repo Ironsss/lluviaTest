@@ -91,13 +91,16 @@
     border-top:.5px solid var(--hair);border-radius:22px 22px 0 0;
     box-shadow:0 -8px 40px rgba(0,0,0,.4);
     transition:transform .38s cubic-bezier(.32,.72,0,1);
-    padding-bottom:var(--safe-bot);will-change:transform;touch-action:none}
+    padding-bottom:var(--safe-bot);will-change:transform}
   .sheet.open{transform:translateY(0)}
-  .sheet-handle{width:100%;padding:10px 0 6px;display:flex;justify-content:center;cursor:grab}
+  .sheet-handle{width:100%;padding:10px 0 6px;display:flex;justify-content:center;cursor:grab;touch-action:none}
   .sheet-handle::before{content:"";width:38px;height:5px;border-radius:3px;background:rgba(255,255,255,.28)}
   .sheet-scroll{height:calc(var(--sheet-full) - 30px);overflow-y:auto;-webkit-overflow-scrolling:touch;
     padding:0 20px 20px}
   .sheet.dragging{transition:none}
+  /* abierto: el contenido se desplaza con el dedo; cerrado: todo gesto arrastra la hoja */
+  .sheet.open .sheet-scroll{touch-action:pan-y}
+  .sheet:not(.open) .sheet-scroll{touch-action:none;overflow:hidden}
 
   /* peek content: the headline stats always visible */
   .peek{display:flex;gap:10px;padding:0 4px 16px;border-bottom:.5px solid var(--hair);margin-bottom:16px}
@@ -1029,13 +1032,23 @@
   function setT(y){sheet.style.transform='translateY('+y+'px)';}
   function openSheet(){open=true;sheet.classList.add('open');sheet.style.transform='';}
   function closeSheet(){open=false;sheet.classList.remove('open');sheet.style.transform='';}
+  var pending=false;
   function onStart(e){if(window.innerWidth>820)return;var y=(e.touches?e.touches[0].clientY:e.clientY);
-    // permitir arrastre desde el handle siempre; desde el scroll solo si esta arriba del todo
-    if(e.target!==handle && !handle.contains(e.target)){ if(open && scroll.scrollTop>0) return; }
-    measure();dragging=true;startY=y;startT=open?0:(FULL-PEEK);sheet.classList.add('dragging');}
-  function onMove(e){if(!dragging)return;var y=(e.touches?e.touches[0].clientY:e.clientY);var dy=y-startY;
+    measure();startY=y;startT=open?0:(FULL-PEEK);
+    // desde el contenido con la hoja abierta: decidir en el primer movimiento si es scroll o arrastre
+    if(e.target!==handle && !handle.contains(e.target) && open){pending=true;return;}
+    dragging=true;sheet.classList.add('dragging');}
+  function onMove(e){
+    var y=(e.touches?e.touches[0].clientY:e.clientY),dy=y-startY;
+    if(pending){
+      if(Math.abs(dy)<6)return;
+      pending=false;
+      // solo arrastra la hoja si el contenido esta arriba del todo y el gesto va hacia abajo
+      if(scroll.scrollTop<=0&&dy>0){dragging=true;sheet.classList.add('dragging');}else return;
+    }
+    if(!dragging)return;
     var t=Math.max(0,Math.min(FULL-PEEK,startT+dy));setT(t);if(e.cancelable)e.preventDefault();}
-  function onEnd(){if(!dragging)return;dragging=false;sheet.classList.remove('dragging');
+  function onEnd(){pending=false;if(!dragging)return;dragging=false;sheet.classList.remove('dragging');
     var m=/translateY\(([\d.]+)px\)/.exec(sheet.style.transform);var cur=m?parseFloat(m[1]):(open?0:FULL-PEEK);
     var mid=(FULL-PEEK)/2; if(cur<mid)openSheet();else closeSheet();}
   handle.addEventListener('touchstart',onStart,{passive:true});
