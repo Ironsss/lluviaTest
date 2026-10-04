@@ -84,7 +84,12 @@
   .tl-scrub::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;
     background:#fff;box-shadow:0 1px 5px rgba(0,0,0,.4);cursor:pointer}
   .tl-scrub::-moz-range-thumb{width:17px;height:17px;border:none;border-radius:50%;background:#fff;cursor:pointer}
-  .tl-ticks{display:flex;justify-content:space-between;margin-top:6px;font-size:10px;color:var(--faint);font-variant-numeric:tabular-nums}
+  .tl-track{position:relative}
+  .tl-nowmark{position:absolute;top:-4px;width:2px;height:13px;margin-left:-1px;border-radius:1px;background:#fff;opacity:.85;pointer-events:none;display:none}
+  .tl-ticks{position:relative;height:14px;margin-top:6px;font-size:10px;color:var(--faint);font-variant-numeric:tabular-nums}
+  .tl-ticks span{position:absolute;top:0;white-space:nowrap}
+  #tlStart{left:0}#tlEnd{right:0;color:var(--accent2);font-weight:700}
+  #tlNow{display:none;transform:translateX(-50%);color:var(--text);font-weight:600}
 
   /* ---------- bottom sheet ---------- */
   :root{--sheet-peek:132px;--sheet-full:74vh}
@@ -156,14 +161,16 @@
 
 
   /* pronostico puntual */
-  .tl-fc{display:none;gap:6px;margin-top:9px;flex-wrap:wrap}
+  .tl-fc{display:none;gap:6px;margin-top:9px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .tl-fc::-webkit-scrollbar{display:none}
   .tl-fc.show{display:flex}
-  .tl-fc .pill{font-size:11px;font-weight:600;color:var(--text);background:rgba(255,255,255,.07);border-radius:10px;padding:3px 8px;
+  .tl-fc .pill{flex:none;border:none;font-family:var(--sys);cursor:pointer;font-size:11px;font-weight:600;color:var(--text);background:rgba(255,255,255,.07);border-radius:10px;padding:3px 8px;
     display:flex;align-items:center;gap:5px;font-variant-numeric:tabular-nums}
+  .tl-fc .pill.now{background:rgba(76,201,240,.18);color:var(--accent)}
   .tl-fc .pill i{width:7px;height:7px;border-radius:50%;display:block}
   .fc-where{font-size:12px;color:var(--faint);margin-bottom:6px}
   .fc-head{font-size:17px;font-weight:700;letter-spacing:-.01em;margin-bottom:12px;line-height:1.25}
-  .fc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+  .fc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
   .fc-card{background:rgba(255,255,255,.05);border:1.5px solid var(--hair);border-radius:12px;padding:9px 6px;text-align:center}
   .fc-card .k{font-size:11px;color:var(--dim);font-weight:600}
   .fc-card .v{font-size:20px;font-weight:700;margin:3px 0 1px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
@@ -275,8 +282,8 @@
       <div class="tl-label"><span class="tag" id="tlTag">Pasado</span><b id="tlTime">—</b></div>
       <button class="tl-play" id="tlPlay" aria-label="Reproducir">▶</button>
     </div>
-    <input type="range" class="tl-scrub" id="tlScrub" min="0" max="0" value="0">
-    <div class="tl-ticks"><span id="tlStart">−2 h</span><span>ahora</span><span id="tlEnd">+30 min</span></div>
+    <div class="tl-track"><input type="range" class="tl-scrub" id="tlScrub" min="0" max="0" value="0"><i class="tl-nowmark" id="tlNowMark"></i></div>
+    <div class="tl-ticks"><span id="tlStart">−2 h</span><span id="tlNow">ahora</span><span id="tlEnd">ahora</span></div>
     <div class="tl-fc" id="tlFc"></div>
   </div>
 
@@ -290,12 +297,12 @@
       </div>
 
       <div class="sec">
-        <div class="sec-h">Pronóstico · próximos 40 min</div>
+        <div class="sec-h">Pronóstico · próximos 60 min</div>
         <div class="fc-where" id="fcWhere">Centro de CDMX</div>
         <div class="fc-head" id="fcHead">Calculando…</div>
         <div class="fc-grid" id="fcGrid"></div>
         <div class="fc-chart" id="fcChart"></div>
-        <div class="fc-ticks"><span id="fcT0">−80 min</span><span>ahora</span><span>+40 min</span></div>
+        <div class="fc-ticks"><span id="fcT0">−80 min</span><span>ahora</span><span>+60 min</span></div>
         <div class="legend-note" id="fcNote">Toca el mapa o usa tu ubicación para elegir el punto. Modelo ligero con el movimiento observado en el radar; no sustituye alertas oficiales.</div>
       </div>
 
@@ -334,7 +341,7 @@
             <span class="sw-tog"><input type="checkbox" id="tRadar" checked><span class="track"></span></span></label>
           <label class="row"><span class="rl">Flecha de dirección<small>Hacia dónde se mueve el sistema</small></span>
             <span class="sw-tog"><input type="checkbox" id="tVec" checked><span class="track"></span></span></label>
-          <label class="row"><span class="rl">Incluir nowcast<small>Pronóstico a corto plazo</small></span>
+          <label class="row"><span class="rl">Incluir pronóstico en el mapa<small>Extrapolación del radar hasta +60 min</small></span>
             <span class="sw-tog"><input type="checkbox" id="tNow" checked><span class="track"></span></span></label>
           <label class="row"><span class="rl">Auto-actualizar<small>Cada 5 minutos</small></span>
             <span class="sw-tog"><input type="checkbox" id="tAuto" checked><span class="track"></span></span></label>
@@ -412,7 +419,7 @@
   map.createPane('labelPane');map.getPane('labelPane').style.zIndex=360;map.getPane('labelPane').style.pointerEvents='none';
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',{maxZoom:17,maxNativeZoom:16,pane:'labelPane'}).addTo(map);
   map.getPane('labelPane').style.filter='brightness(1.3) contrast(1.15)';
-  map.on('zoomend',function(){if(curLayer&&$('tRadar').checked)curLayer.setOpacity(radarOpacityFor(map.getZoom()));});
+  map.on('zoomend',function(){if(curLayer&&$('tRadar').checked)curLayer.setOpacity(frameOpacity(frames[pos]));});
   map.setMaxBounds(BOUNDS);
 
   var host='',frames=[],pastCount=0,pos=0,curLayer=null,layerCache={},playing=false,playTimer=null,loading=false;
@@ -423,6 +430,7 @@
   function fmtTime(ts){return new Date(ts*1000).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});}
 
   function makeLayer(frame){
+    if(frame.__fc)return fcOverlay(frame);
     return new L.TileLayer(host+frame.path+'/'+TILE_SIZE+'/{z}/{x}/{y}/2/1_1.png',
       {tileSize:256,opacity:0.001,maxNativeZoom:7,maxZoom:16,pane:'radarPane',className:'radar-tiles'});
   }
@@ -431,17 +439,17 @@
     if(loading||!frames.length)return;
     if(p>=frames.length)p=0;if(p<0)p=frames.length-1;
     var frame=frames[p], isNow=frame.__nowcast;
-    var tag=$('tlTag');tag.textContent=isNow?'Nowcast':'Pasado';tag.classList.toggle('now',isNow);
-    $('tlTime').textContent=fmtTime(frame.time);$('pFrame').textContent=fmtTime(frame.time);
+    var tag=$('tlTag');tag.textContent=isNow?'Pronóstico':'Pasado';tag.classList.toggle('now',isNow);
+    $('tlTime').textContent=fmtTime(frame.time)+(isNow?' · +'+frame.__fc*10+' min':'');$('pFrame').textContent=fmtTime(frame.time);
     $('tlScrub').value=p;
     var old=curLayer;
     if(!$('tRadar').checked){if(old)old.setOpacity(0);pos=p;return;}
-    if(layerCache[p]){if(old&&old!==layerCache[p])old.setOpacity(0);layerCache[p].setOpacity(radarOpacityFor(map.getZoom()));curLayer=layerCache[p];pos=p;
+    if(layerCache[p]){if(old&&old!==layerCache[p])old.setOpacity(0);layerCache[p].setOpacity(frameOpacity(frame));curLayer=layerCache[p];pos=p;
       if(playing)playTimer=setTimeout(function(){showFrame(pos+1);},520);return;}
     loading=true;var nl=makeLayer(frame);
-    nl.on('load',function(){nl.setOpacity(radarOpacityFor(map.getZoom()));if(old)old.setOpacity(0);layerCache[p]=nl;curLayer=nl;pos=p;loading=false;
+    nl.on('load',function(){nl.setOpacity(frameOpacity(frame));if(old)old.setOpacity(0);layerCache[p]=nl;curLayer=nl;pos=p;loading=false;
       if(playing)playTimer=setTimeout(function(){showFrame(pos+1);},520);});
-    nl.on('tileerror',function(){loading=false;});
+    nl.on('tileerror',function(){loading=false;});nl.on('error',function(){loading=false;});
     nl.addTo(map);
   }
   function stop(){if(playTimer){clearTimeout(playTimer);playTimer=null;}playing=false;$('tlPlay').innerHTML='▶';}
@@ -544,12 +552,12 @@
     return {vx:vx,vy:vy,mag:Math.sqrt(vx*vx+vy*vy)};
   }
 
-  // ============ PRONOSTICO PUNTUAL (hasta 40 min, pasos de 10) ============
+  // ============ PRONOSTICO PUNTUAL (hasta 60 min, pasos de 10) ============
   // Modelo ligero y reactivo: campo de intensidad local (ventana ~150 km) por frame del radar,
   // flujo optico por block matching (ponderado hacia los frames mas recientes y hacia el punto),
   // advectado hacia atras (semi-lagrangiano) con incertidumbre creciente + tendencia de intensidad.
   // <fc-model>
-  var NG=64, WET=0.1, FC_LEAD=4, FC_STEP=600;
+  var NG=64, WET=0.1, FC_LEAD=6, FC_STEP=600;
   function clamp(x,a,b){return x<a?a:(x>b?b:x);}
   function bil(f,x,y){
     x=clamp(x,0,NG-1);y=clamp(y,0,NG-1);
@@ -740,17 +748,19 @@
     var leads=res.leads,i,cur=res.obs[res.obs.length-1];
     // titular
     var wetNow=cur.p>=0.5,head,k;
-    if(res.dry&&leads.every(function(l){return l.p<0.1;}))head='Sin lluvia en la zona · sin lluvia prevista en 40 min';
+    if(res.dry&&leads.every(function(l){return l.p<0.1;}))head='Sin lluvia en la zona · sin lluvia prevista en 60 min';
     else if(!wetNow){
       for(k=0;k<leads.length&&leads[k].p<0.5;k++);
-      head=k<leads.length?'Lluvia '+catOf(leads[k].cond).n.toLowerCase()+' en ~'+leads[k].min+' min':'Seco en los próximos 40 min';
+      head=k<leads.length?'Lluvia '+catOf(leads[k].cond).n.toLowerCase()+' en ~'+leads[k].min+' min':'Seco en los próximos 60 min';
     }else{
       for(k=0;k<leads.length&&leads[k].p>=0.5;k++);
-      head=k<leads.length?'Llueve ahora · deja de llover en ~'+leads[k].min+' min':'Llueve ahora · continúa 40+ min';
+      head=k<leads.length?'Llueve ahora · deja de llover en ~'+leads[k].min+' min':'Llueve ahora · continúa 60+ min';
     }
     $('fcHead').textContent=head;
-    // tarjetas +10..+40
+    // tarjetas +10..+60
     var grid=$('fcGrid'),pills=$('tlFc');grid.textContent='';pills.textContent='';
+    var nowPill=el('button','pill now','Ahora');nowPill.type='button';nowPill.onclick=function(){stop();showFrame(pastCount-1);};pills.appendChild(nowPill);
+    fcRun={vel:res.vel,g:res.trend,dry:res.dry};
     leads.forEach(function(l){
       var cat=l.p<0.25?CATS[0]:catOf(l.cond),pct=Math.round(l.p*100);
       var card=el('div','fc-card');card.style.borderColor=cat.c;
@@ -758,8 +768,10 @@
       card.appendChild(el('div','v',pct+'%'));
       var c=el('div','c',cat.n);c.style.color=cat.c;card.appendChild(c);
       card.appendChild(el('div','t',fmtTime(l.t)));grid.appendChild(card);
-      var pill=el('span','pill');var dot=el('i');dot.style.background=cat.c;pill.appendChild(dot);
-      pill.appendChild(document.createTextNode('+'+l.min+' '+pct+'%'));pills.appendChild(pill);
+      var pill=el('button','pill');pill.type='button';var dot=el('i');dot.style.background=cat.c;pill.appendChild(dot);
+      pill.appendChild(document.createTextNode('+'+l.min+' '+pct+'%'));
+      pill.onclick=function(){stop();var ix=pastCount-1+l.min/10;if(ix<frames.length)showFrame(ix);};
+      pills.appendChild(pill);
     });
     pills.classList.add('show');
     // grafica: observado (barras solidas) + pronostico (barras translucidas)
@@ -793,7 +805,7 @@
     if(kind!=='user'){
       fcMk=L.circleMarker([fcPoint.lat,fcPoint.lon],{radius:7,color:'#fff',weight:2,fillColor:'#5ee0d0',fillOpacity:1,interactive:false}).addTo(map);
     }
-    return runForecast();
+    return runForecast().then(buildForecastFrames);
   }
   function runForecast(){
     var mySeq=++fcSeq;
@@ -1139,6 +1151,76 @@
       if(rt.a&&rt.b){rt.fit=true;runRoute();}};
   });
 
+  // ============ CUADROS DE PRONOSTICO EN EL MAPA (+10 ... +60 min) ============
+  // El ultimo cuadro de radar se descarga como mosaico z7 (cubre toda la zona de la app) y se desplaza con el movimiento
+  // estimado por el modelo; la incertidumbre crece con el horizonte (suavizado y menor opacidad). Se agregan al final de la
+  // linea de tiempo para verlos igual que el radar observado.
+  var FC_FRAMES_N=6, fcRun=null, fcMos=null;
+  function mercPx(lat,lon){var n=256*Math.pow(2,FZ),s=Math.sin(lat*Math.PI/180);
+    return {x:(lon+180)/360*n,y:(0.5-Math.log((1+s)/(1-s))/(4*Math.PI))*n};}
+  function pxLatLon(x,y){var n=256*Math.pow(2,FZ);
+    return [Math.atan(Math.sinh(Math.PI*(1-2*y/n)))*180/Math.PI,x/n*360-180];}
+  function loadMosaic(frame){
+    if(fcMos&&fcMos.t===frame.time)return Promise.resolve(fcMos);
+    var nw=mercPx(BOUNDS[1][0],BOUNDS[0][1]),se=mercPx(BOUNDS[0][0],BOUNDS[1][1]);
+    var tx0=Math.floor(nw.x/256)-1,ty0=Math.floor(nw.y/256)-1,tx1=Math.floor(se.x/256)+1,ty1=Math.floor(se.y/256)+1,jobs=[],tx,ty;
+    for(ty=ty0;ty<=ty1;ty++)for(tx=tx0;tx<=tx1;tx++)jobs.push(fcTile(frame,tx,ty));
+    return Promise.all(jobs).then(function(r){
+      var c=document.createElement('canvas');c.width=(tx1-tx0+1)*256;c.height=(ty1-ty0+1)*256;
+      var x=c.getContext('2d'),ok=0;
+      r.forEach(function(t){if(t){x.drawImage(t.img,(t.tx-tx0)*256,(t.ty-ty0)*256);ok++;}});
+      if(!ok)throw new Error('mosaico vacio');
+      var a=pxLatLon(tx0*256,ty0*256),b=pxLatLon((tx1+1)*256,(ty1+1)*256);
+      fcMos={t:frame.time,canvas:c,w:c.width,h:c.height,bounds:L.latLngBounds([b[0],a[1]],[a[0],b[1]])};
+      return fcMos;
+    });
+  }
+  // imagen del pronostico para el cuadro `frame` (desplazamiento + dispersion), como L.imageOverlay
+  function fcOverlay(frame){
+    var M=fcMos,tau=frame.time-M.t,k=tau/FC_STEP,c=document.createElement('canvas');c.width=M.w;c.height=M.h;
+    var x=c.getContext('2d'),dx=fcRun.vel.u*tau*FSTEP,dy=fcRun.vel.v*tau*FSTEP,s=0.6+1.2*k;
+    // promedio incremental de 5 copias desplazadas: suaviza segun la incertidumbre
+    [[0,0],[s,0],[-s,0],[0,s],[0,-s]].forEach(function(o,i){x.globalAlpha=1/(i+1);x.drawImage(M.canvas,dx+o[0],dy+o[1]);});
+    return L.imageOverlay(c.toDataURL('image/png'),M.bounds,{pane:'radarPane',opacity:0.001,className:'radar-tiles',interactive:false});
+  }
+  // opacidad de un cuadro: baja con el zoom (calles) y con el horizonte (incertidumbre) / tendencia de la lluvia
+  function frameOpacity(frame){
+    var o=radarOpacityFor(map.getZoom());
+    if(frame&&frame.__fc){var k=frame.__fc,g=fcRun?fcRun.g:0;
+      o*=(1-0.3*k/FC_FRAMES_N)*clamp(1+g*k*Math.exp(-k/3.5),0.55,1.05);}
+    return o;
+  }
+  function dropFcFrames(){
+    for(var p in layerCache){if(parseInt(p)>=pastCount){map.removeLayer(layerCache[p]);if(curLayer===layerCache[p])curLayer=null;delete layerCache[p];}}
+    frames=frames.slice(0,pastCount);
+  }
+  // etiquetas y marcador "ahora" de la linea de tiempo; la zona de pronostico se pinta distinta
+  function applyTimeline(){
+    var n=frames.length;if(!n)return;
+    var hasF=n>pastCount,pct=n>1?(pastCount-1)/(n-1):1;
+    var sc=$('tlScrub');sc.max=Math.max(0,n-1);
+    sc.style.background=hasF?'linear-gradient(90deg,rgba(255,255,255,.2) 0 '+(pct*100).toFixed(1)+'%,rgba(94,224,208,.6) '+(pct*100).toFixed(1)+'% 100%)':'';
+    var left='calc(8.5px + (100% - 17px) * '+pct.toFixed(4)+')';
+    $('tlNowMark').style.left=left;$('tlNowMark').style.display=hasF?'block':'none';
+    $('tlNow').style.left=left;$('tlNow').style.display=hasF?'block':'none';
+    $('tlStart').textContent=fmtTime(frames[0].time);
+    $('tlEnd').textContent=hasF?'+'+Math.round((frames[n-1].time-Date.now()/1000)/600)*10+' min':'ahora';
+    $('timeline').classList.add('show');
+  }
+  function buildForecastFrames(){
+    if(!frames.length||pastCount<2)return Promise.resolve();
+    var keepPos=pos;
+    dropFcFrames();
+    if(!$('tNow').checked||!fcRun){applyTimeline();if(keepPos>=pastCount){pos=pastCount-1;showFrame(pos);}return Promise.resolve();}
+    return loadMosaic(frames[pastCount-1]).then(function(){
+      var now=Date.now()/1000,fr=[];
+      for(var j=1;j<=FC_FRAMES_N;j++)fr.push({time:now+j*FC_STEP,__nowcast:true,__fc:j});
+      frames=frames.slice(0,pastCount).concat(fr);
+      applyTimeline();
+      if(keepPos>=pastCount){pos=Math.min(keepPos,frames.length-1);showFrame(pos);}
+    }).catch(function(e){console.warn('[lluvia] cuadros de pronostico no disponibles',e);applyTimeline();});
+  }
+
   // ============ SISTEMA DE PARTICULAS (flujo animado) ============
   var particles=[], rafId=null, dpr=Math.min(window.devicePixelRatio||1,2);
   function particleCount(){var w=vecCanvas.clientWidth,h=vecCanvas.clientHeight;
@@ -1206,12 +1288,9 @@
       if(!api||!api.radar||!api.radar.past)throw new Error('radar sin frames');
       host=api.host;
       var past=api.radar.past.map(function(f){f.__nowcast=false;return f;});
-      var now=($('tNow').checked&&api.radar.nowcast)?api.radar.nowcast.map(function(f){f.__nowcast=true;return f;}):[];
-      pastCount=past.length; frames=past.concat(now);
+      pastCount=past.length; frames=past;
       clearCache();layerCache={};curLayer=null;
-      $('tlScrub').max=frames.length-1;$('timeline').classList.add('show');
-      if(past.length)$('tlStart').textContent=fmtTime(past[0].time);
-      if(now.length)$('tlEnd').textContent=fmtTime(now[now.length-1].time); else $('tlEnd').textContent='ahora';
+      applyTimeline();
       pos=Math.max(0,past.length-1);showFrame(pos);
     });
   }
@@ -1219,7 +1298,7 @@
     return loadRadar().then(function(){
       setSub('En vivo · actualizado '+new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}));
       $('stamp').textContent=new Date().toLocaleTimeString('es-MX');hideBanner();
-      return computeAdvection().then(renderVector).then(runForecast).then(runRoute);
+      return computeAdvection().then(renderVector).then(runForecast).then(buildForecastFrames).then(runRoute);
     }).catch(function(e){setSub('Radar no disponible · reintentando',true);showBanner('No se pudo cargar el radar. Se reintentará en un momento.');console.error('[lluvia]',e);});
   }
 
@@ -1228,7 +1307,7 @@
   $('tlScrub').oninput=function(e){stop();showFrame(parseInt(e.target.value,10));};
   $('tRadar').onchange=function(e){if(!e.target.checked){if(curLayer)curLayer.setOpacity(0);}else showFrame(pos);};
   $('tVec').onchange=function(){ if(!$('tVec').checked)clearVec(); else renderVector(); };
-  $('tNow').onchange=function(){stop();loadRadar();};
+  $('tNow').onchange=function(){stop();buildForecastFrames();};
   var timer=setInterval(update,REFRESH_MS);
   $('tAuto').onchange=function(e){clearInterval(timer);if(e.target.checked)timer=setInterval(update,REFRESH_MS);};
   map.on('movestart',function(){stop();});
