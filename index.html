@@ -147,6 +147,28 @@
     box-shadow:0 0 0 rgba(76,201,240,.5);animation:userpulse 2s infinite}
   @keyframes userpulse{0%{box-shadow:0 0 0 0 rgba(76,201,240,.5)}70%{box-shadow:0 0 0 16px rgba(76,201,240,0)}100%{box-shadow:0 0 0 0 rgba(76,201,240,0)}}
 
+
+  /* pronostico puntual */
+  .tl-fc{display:none;gap:6px;margin-top:9px;flex-wrap:wrap}
+  .tl-fc.show{display:flex}
+  .tl-fc .pill{font-size:11px;font-weight:600;color:var(--text);background:rgba(255,255,255,.07);border-radius:10px;padding:3px 8px;
+    display:flex;align-items:center;gap:5px;font-variant-numeric:tabular-nums}
+  .tl-fc .pill i{width:7px;height:7px;border-radius:50%;display:block}
+  .fc-where{font-size:12px;color:var(--faint);margin-bottom:6px}
+  .fc-head{font-size:17px;font-weight:700;letter-spacing:-.01em;margin-bottom:12px;line-height:1.25}
+  .fc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+  .fc-card{background:rgba(255,255,255,.05);border:1.5px solid var(--hair);border-radius:12px;padding:9px 6px;text-align:center}
+  .fc-card .k{font-size:11px;color:var(--dim);font-weight:600}
+  .fc-card .v{font-size:20px;font-weight:700;margin:3px 0 1px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .fc-card .c{font-size:11px;font-weight:600}
+  .fc-card .t{font-size:10px;color:var(--faint);margin-top:2px;font-variant-numeric:tabular-nums}
+  .fc-chart{display:flex;align-items:flex-end;gap:3px;height:54px;border-bottom:.5px solid var(--hair)}
+  .fc-chart .col{flex:1;height:100%;display:flex;align-items:flex-end}
+  .fc-chart .bar{width:100%;border-radius:3px 3px 0 0}
+  .fc-chart .col.fc .bar{opacity:.55;background-image:repeating-linear-gradient(135deg,rgba(0,0,0,.28) 0 3px,transparent 3px 6px)}
+  .fc-chart .col.first{margin-left:6px}
+  .fc-ticks{display:flex;justify-content:space-between;font-size:10px;color:var(--faint);margin:5px 0 8px;font-variant-numeric:tabular-nums}
+
   @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
   @media (min-width:821px){
     /* en escritorio: sheet fija abierta como panel lateral */
@@ -188,6 +210,7 @@
     </div>
     <input type="range" class="tl-scrub" id="tlScrub" min="0" max="0" value="0">
     <div class="tl-ticks"><span id="tlStart">−2 h</span><span>ahora</span><span id="tlEnd">+30 min</span></div>
+    <div class="tl-fc" id="tlFc"></div>
   </div>
 
   <div class="sheet" id="sheet">
@@ -197,6 +220,16 @@
         <div class="peek-card"><div class="k">Frame</div><div class="v accent" id="pFrame">—</div></div>
         <div class="peek-card"><div class="k">Se mueve a</div><div class="v" id="pDir">—</div></div>
         <div class="peek-card"><div class="k">Fuente</div><div class="v" id="pSource">Radar</div></div>
+      </div>
+
+      <div class="sec">
+        <div class="sec-h">Pronóstico · próximos 40 min</div>
+        <div class="fc-where" id="fcWhere">Centro de CDMX</div>
+        <div class="fc-head" id="fcHead">Calculando…</div>
+        <div class="fc-grid" id="fcGrid"></div>
+        <div class="fc-chart" id="fcChart"></div>
+        <div class="fc-ticks"><span id="fcT0">−80 min</span><span>ahora</span><span>+40 min</span></div>
+        <div class="legend-note" id="fcNote">Toca el mapa o usa tu ubicación para elegir el punto. Modelo ligero con el movimiento observado en el radar; no sustituye alertas oficiales.</div>
       </div>
 
       <div class="sec">
@@ -398,6 +431,244 @@
     return {vx:vx,vy:vy,mag:Math.sqrt(vx*vx+vy*vy)};
   }
 
+  // ============ PRONOSTICO PUNTUAL (hasta 40 min, pasos de 10) ============
+  // Modelo ligero y reactivo: campo de intensidad local (ventana ~150 km) por frame del radar,
+  // flujo optico por block matching (ponderado hacia los frames mas recientes y hacia el punto),
+  // advectado hacia atras (semi-lagrangiano) con incertidumbre creciente + tendencia de intensidad.
+  // <fc-model>
+  var NG=64, WET=0.1, FC_LEAD=4, FC_STEP=600;
+  function clamp(x,a,b){return x<a?a:(x>b?b:x);}
+  function bil(f,x,y){
+    x=clamp(x,0,NG-1);y=clamp(y,0,NG-1);
+    var x0=Math.floor(x),y0=Math.floor(y),x1=Math.min(NG-1,x0+1),y1=Math.min(NG-1,y0+1),fx=x-x0,fy=y-y0;
+    return (f[y0*NG+x0]*(1-fx)+f[y0*NG+x1]*fx)*(1-fy)+(f[y1*NG+x0]*(1-fx)+f[y1*NG+x1]*fx)*fy;
+  }
+  // error cuadratico medio de que cur(x,y) venga de prev(x-dx,y-dy) dentro del bloque
+  function fcSad(prev,cur,bx,by,bs,dx,dy){
+    var s=0,n=0;
+    for(var y=by;y<by+bs;y++)for(var x=bx;x<bx+bs;x++){
+      var px=x-dx,py=y-dy;if(px<0||py<0||px>=NG||py>=NG)continue;
+      var d=cur[y*NG+x]-prev[py*NG+px];s+=d*d;n++;
+    }
+    return n>bs*bs*0.5?s/n:Infinity;
+  }
+  function fcMatch(prev,cur,bx,by,bs,sr,base){
+    var best=fcSad(prev,cur,bx,by,bs,0,0),bdx=0,bdy=0;
+    for(var dy=-sr;dy<=sr;dy++)for(var dx=-sr;dx<=sr;dx++){
+      if(!dx&&!dy)continue;
+      var s=fcSad(prev,cur,bx,by,bs,dx,dy);
+      if(s<best-1e-7){best=s;bdx=dx;bdy=dy;}
+    }
+    if(!isFinite(best))return null;
+    // refinamiento sub-celda (parabola sobre el minimo)
+    var rx=bdx,ry=bdy,sm,sp,den;
+    sm=fcSad(prev,cur,bx,by,bs,bdx-1,bdy);sp=fcSad(prev,cur,bx,by,bs,bdx+1,bdy);den=sm-2*best+sp;
+    if(isFinite(den)&&den>1e-9)rx+=clamp(0.5*(sm-sp)/den,-.5,.5);
+    sm=fcSad(prev,cur,bx,by,bs,bdx,bdy-1);sp=fcSad(prev,cur,bx,by,bs,bdx,bdy+1);den=sm-2*best+sp;
+    if(isFinite(den)&&den>1e-9)ry+=clamp(0.5*(sm-sp)/den,-.5,.5);
+    return {dx:rx,dy:ry,conf:clamp(1-best/(base+1e-6),0,1)};
+  }
+  // desplazamiento medio (celdas por par de frames) cerca del punto c={x,y}
+  function fcPairMotion(prev,cur,c){
+    var bs=10,step=5,sr=6,su=0,sv=0,sw=0;
+    for(var by=0;by<=NG-bs;by+=step)for(var bx=0;bx<=NG-bs;bx+=step){
+      var e=0,e2=0;
+      for(var y=by;y<by+bs;y++)for(var x=bx;x<bx+bs;x++){var q=cur[y*NG+x];e+=q;e2+=q*q;}
+      if(e<2)continue;                                   // casi sin lluvia
+      var mean=e/(bs*bs);if(e2/(bs*bs)-mean*mean<0.0015)continue; // sin textura: movimiento ambiguo
+      var m=fcMatch(prev,cur,bx,by,bs,sr,e2/(bs*bs));
+      if(!m||m.conf<0.25)continue;
+      var ddx=bx+bs/2-c.x,ddy=by+bs/2-c.y;
+      var lw=0.2+0.8*Math.exp(-(ddx*ddx+ddy*ddy)/(2*18*18)); // lo cercano al punto pesa mas
+      var w=e*m.conf*lw;su+=m.dx*w;sv+=m.dy*w;sw+=w;
+    }
+    return sw>0?{u:su/sw,v:sv/sw,wt:sw}:null;
+  }
+  // combina pares viejo->nuevo: el mas reciente pesa mas (reactivo)
+  function fcCombine(pms){
+    var su=0,sv=0,sw=0;
+    for(var i=0;i<pms.length;i++){
+      var w=clamp(pms[i].wt/15,0,1)*Math.pow(0.6,pms.length-1-i);
+      su+=pms[i].u*w;sv+=pms[i].v*w;sw+=w;
+    }
+    return sw>0.05?{u:su/sw,v:sv/sw,q:sw}:null;
+  }
+  // estadisticas en un disco: probabilidad de lluvia, intensidad si llueve, media
+  function fcDisc(f,cx,cy,r){
+    var ir=Math.ceil(r),sw=0,sw1=0,swi=0,sm=0;
+    for(var dy=-ir;dy<=ir;dy++)for(var dx=-ir;dx<=ir;dx++){
+      if(dx*dx+dy*dy>r*r)continue;
+      var val=bil(f,cx+dx,cy+dy);sw++;sm+=val;if(val>=WET){sw1++;swi+=val;}
+    }
+    return {p:sw1/sw,cond:sw1?swi/sw1:0,mean:sm/sw};
+  }
+  // series: [{t,f}] de viejo a nuevo; c: celda del punto; nowSec: ahora (s)
+  function fcModel(series,c,nowSec){
+    var n=series.length,last=series[n-1],t0=last.t,pms=[],i;
+    for(i=1;i<n;i++){
+      var dt=series[i].t-series[i-1].t;if(dt<=0||dt>1500)continue;
+      var m=fcPairMotion(series[i-1].f,series[i].f,c);
+      if(m)pms.push({i:i,u:m.u/dt,v:m.v/dt,wt:m.wt});
+    }
+    var mv=fcCombine(pms),vel=mv||{u:0,v:0},q=mv?mv.q:0;
+    // verificacion rapida (hindcast): predecir el ultimo frame con el movimiento de los anteriores
+    var skill=null;
+    if(n>=3){
+      var prior=pms.filter(function(p){return p.i<n-1;}),vh=fcCombine(prior);
+      if(vh){
+        var pf=series[n-2].f,cf=last.f,dtl=last.t-series[n-2].t,ea=0,ep=0,en=0,act=0;
+        for(var y=0;y<NG;y++)for(var x=0;x<NG;x++){
+          var ddx=x-c.x,ddy=y-c.y;if(ddx*ddx+ddy*ddy>16*16)continue;
+          var o=cf[y*NG+x],a=bil(pf,x-vh.u*dtl,y-vh.v*dtl),pp=pf[y*NG+x];
+          ea+=(o-a)*(o-a);ep+=(o-pp)*(o-pp);en++;act+=o+pp;
+        }
+        if(act>2&&ep>1e-6)skill=clamp(1-ea/ep,0,1);
+      }
+    }
+    // tendencia de intensidad siguiendo la "parcela" que llegara a mitad del pronostico
+    var tauMid=1200+Math.max(0,nowSec-t0),lx=c.x-vel.u*tauMid,ly=c.y-vel.v*tauMid,ms=[];
+    for(i=Math.max(0,n-4);i<n;i++){
+      var ds=series[i].t-t0;ms.push(fcDisc(series[i].f,lx+vel.u*ds,ly+vel.v*ds,8).mean);
+    }
+    var g=0;
+    if(ms.length>=3){
+      var avg=0;for(i=0;i<ms.length;i++)avg+=ms[i];avg/=ms.length;
+      g=clamp((ms[ms.length-1]-ms[0])/(ms.length-1)/(avg+0.04),-0.3,0.3);
+    }
+    var cps=Math.sqrt(vel.u*vel.u+vel.v*vel.v),leads=[];
+    for(var j=1;j<=FC_LEAD;j++){
+      var tau=nowSec+j*FC_STEP-t0,k=tau/FC_STEP;
+      var r=Math.min(14,2+0.6*k+0.2*cps*tau);               // incertidumbre crece con el horizonte
+      var s=fcDisc(last.f,c.x-vel.u*tau,c.y-vel.v*tau,r);
+      var fac=clamp(1+g*k*Math.exp(-k/3.5),0.35,1.9);
+      var cond=Math.min(1,s.cond*fac),p=Math.min(1,s.p*clamp(0.5+0.5*fac,0.6,1.05));
+      leads.push({min:j*10,t:nowSec+j*FC_STEP,p:p,cond:cond,score:p*cond});
+    }
+    var obs=series.map(function(sr){var s=fcDisc(sr.f,c.x,c.y,2);return {t:sr.t,p:s.p,cond:s.cond,score:s.p*s.cond};});
+    var peak=0;for(i=0;i<last.f.length;i++)if(last.f[i]>peak)peak=last.f[i];
+    return {leads:leads,obs:obs,vel:vel,cps:cps,q:q,skill:skill,trend:g,dry:peak<WET,lag:nowSec-t0,frames:n};
+  }
+  // </fc-model>
+
+  // --- ventana local del radar (z7, 128 px ~150 km) -> grilla NG x NG de intensidad ---
+  var FZ=7, FWIN=128, FSTEP=FWIN/NG, FC_FRAMES=9;
+  var fcPoint={lat:CENTER[0],lon:CENTER[1],label:'Centro de CDMX',kind:'center'};
+  var fcCache={}, fcSeq=0, fcMk=null;
+  var fcCanvas=document.createElement('canvas'), fcCtx=fcCanvas.getContext('2d',{willReadFrequently:true});
+  fcCanvas.width=fcCanvas.height=FWIN;
+  var CATS=[{max:.1,n:'Sin lluvia',c:'#5b6f82'},{max:.3,n:'Ligera',c:'#3a8fd6'},{max:.5,n:'Moderada',c:'#3ad6a0'},
+            {max:.7,n:'Fuerte',c:'#e8d63a'},{max:.9,n:'Muy fuerte',c:'#e8853a'},{max:9,n:'Torrencial',c:'#f72585'}];
+  function catOf(i){for(var k=0;k<CATS.length;k++)if(i<CATS[k].max)return CATS[k];return CATS[CATS.length-1];}
+  function el(tag,cls,txt){var e=document.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e;}
+
+  function fcWindow(lat,lon){
+    var n=256*Math.pow(2,FZ),s=Math.sin(lat*Math.PI/180);
+    var gx=(lon+180)/360*n, gy=(0.5-Math.log((1+s)/(1-s))/(4*Math.PI))*n;
+    var x0=Math.floor(gx)-FWIN/2, y0=Math.floor(gy)-FWIN/2;
+    return {x0:x0,y0:y0,cx:(gx-x0)/FSTEP-0.5,cy:(gy-y0)/FSTEP-0.5,km:40075.017*Math.cos(lat*Math.PI/180)/n*FSTEP};
+  }
+  function fcTile(frame,tx,ty){
+    return new Promise(function(res){
+      var img=new Image();img.crossOrigin='anonymous';
+      img.onload=function(){res({img:img,tx:tx,ty:ty});};img.onerror=function(){res(null);};
+      img.src=host+frame.path+'/256/'+FZ+'/'+tx+'/'+ty+'/2/1_1.png';
+    });
+  }
+  function fcField(frame,w,key){
+    var ck=frame.time+'|'+key;if(fcCache[ck])return Promise.resolve(fcCache[ck]);
+    var jobs=[],tx,ty;
+    for(ty=Math.floor(w.y0/256);ty<=Math.floor((w.y0+FWIN-1)/256);ty++)
+      for(tx=Math.floor(w.x0/256);tx<=Math.floor((w.x0+FWIN-1)/256);tx++)jobs.push(fcTile(frame,tx,ty));
+    return Promise.all(jobs).then(function(r){
+      var ok=0;fcCtx.clearRect(0,0,FWIN,FWIN);
+      r.forEach(function(t){if(t){fcCtx.drawImage(t.img,t.tx*256-w.x0,t.ty*256-w.y0);ok++;}});
+      if(!ok)return null;
+      var d;try{d=fcCtx.getImageData(0,0,FWIN,FWIN).data;}catch(e){return null;}
+      var f=new Float32Array(NG*NG);
+      for(var y=0;y<NG;y++)for(var x=0;x<NG;x++){
+        var s=0;
+        for(var j=0;j<FSTEP;j++)for(var i=0;i<FSTEP;i++){var o=((y*FSTEP+j)*FWIN+x*FSTEP+i)*4;s+=pxIntensity(d[o],d[o+1],d[o+2],d[o+3]);}
+        f[y*NG+x]=s/(FSTEP*FSTEP);
+      }
+      fcCache[ck]=f;return f;
+    });
+  }
+
+  function fcMsg(t){$('fcHead').textContent=t;$('fcGrid').textContent='';$('fcChart').textContent='';$('tlFc').textContent='';$('tlFc').classList.remove('show');}
+  function renderForecast(res,km){
+    $('fcWhere').textContent=fcPoint.label;
+    var leads=res.leads,i,cur=res.obs[res.obs.length-1];
+    // titular
+    var wetNow=cur.p>=0.5,head,k;
+    if(res.dry&&leads.every(function(l){return l.p<0.1;}))head='Sin lluvia en la zona · sin lluvia prevista en 40 min';
+    else if(!wetNow){
+      for(k=0;k<leads.length&&leads[k].p<0.5;k++);
+      head=k<leads.length?'Lluvia '+catOf(leads[k].cond).n.toLowerCase()+' en ~'+leads[k].min+' min':'Seco en los próximos 40 min';
+    }else{
+      for(k=0;k<leads.length&&leads[k].p>=0.5;k++);
+      head=k<leads.length?'Llueve ahora · deja de llover en ~'+leads[k].min+' min':'Llueve ahora · continúa 40+ min';
+    }
+    $('fcHead').textContent=head;
+    // tarjetas +10..+40
+    var grid=$('fcGrid'),pills=$('tlFc');grid.textContent='';pills.textContent='';
+    leads.forEach(function(l){
+      var cat=l.p<0.25?CATS[0]:catOf(l.cond),pct=Math.round(l.p*100);
+      var card=el('div','fc-card');card.style.borderColor=cat.c;
+      card.appendChild(el('div','k','+'+l.min+' min'));
+      card.appendChild(el('div','v',pct+'%'));
+      var c=el('div','c',cat.n);c.style.color=cat.c;card.appendChild(c);
+      card.appendChild(el('div','t',fmtTime(l.t)));grid.appendChild(card);
+      var pill=el('span','pill');var dot=el('i');dot.style.background=cat.c;pill.appendChild(dot);
+      pill.appendChild(document.createTextNode('+'+l.min+' '+pct+'%'));pills.appendChild(pill);
+    });
+    pills.classList.add('show');
+    // grafica: observado (barras solidas) + pronostico (barras translucidas)
+    var chart=$('fcChart');chart.textContent='';
+    function bar(sc,cond,fc,first){
+      var col=el('div','col'+(fc?' fc':'')+(first?' first':'')),b=el('div','bar');
+      b.style.height=Math.max(sc>0.01?8:3,Math.round(Math.pow(Math.min(1,sc),0.6)*100))+'%';
+      b.style.background=sc>0.01?catOf(cond).c:'#3a4a5a';col.appendChild(b);chart.appendChild(col);
+    }
+    res.obs.forEach(function(o){bar(o.score,o.cond,false);});
+    leads.forEach(function(l,n){bar(l.score,l.cond,true,n===0);});
+    $('fcT0').textContent='−'+Math.round((cur.t-res.obs[0].t)/60)+' min';
+    // nota: movimiento y confianza
+    var conf=res.q<0.3?'Baja':(res.skill==null?'Media':(res.skill>=0.45?'Alta':(res.skill>=0.2?'Media':'Baja')));
+    var mv=res.cps*3600*km,dir=dirLabel((Math.atan2(res.vel.u,-res.vel.v)*180/Math.PI+360)%360);
+    if(!res.dry&&mv>=3){ // el flujo local (mas fino) alimenta tambien la flecha y la tarjeta "Se mueve a"
+      advection={u:res.vel.u*600*km/25,v:res.vel.v*600*km/25,conf:1};
+      $('pDir').textContent=dir;$('pSource').textContent='Radar';
+    }
+    var txt=(res.dry?'No hay lluvia detectada en ~70 km a la redonda. ':
+      (mv>=3?'Sistema hacia '+dir+' a ~'+Math.round(mv)+' km/h. ':'Sistema casi estacionario. '))+
+      'Confianza: '+conf+' · '+res.frames+' frames de radar'+(res.lag>1200?' · datos con '+Math.round(res.lag/60)+' min de retraso':'')+'.';
+    $('fcNote').textContent=txt;
+  }
+  function setFcPoint(lat,lon,label,kind){
+    fcPoint={lat:Math.round(lat*50)/50,lon:Math.round(lon*50)/50,label:label,kind:kind};
+    if(fcMk){map.removeLayer(fcMk);fcMk=null;}
+    if(kind!=='user'){
+      fcMk=L.circleMarker([fcPoint.lat,fcPoint.lon],{radius:7,color:'#fff',weight:2,fillColor:'#5ee0d0',fillOpacity:1,interactive:false}).addTo(map);
+    }
+    return runForecast();
+  }
+  function runForecast(){
+    var mySeq=++fcSeq;
+    if(!frames.length||pastCount<2){fcMsg('Sin datos suficientes del radar');return Promise.resolve();}
+    var use=frames.slice(0,pastCount).slice(-FC_FRAMES),w=fcWindow(fcPoint.lat,fcPoint.lon);
+    var key=fcPoint.lat.toFixed(2)+','+fcPoint.lon.toFixed(2);
+    $('fcWhere').textContent=fcPoint.label;$('fcHead').textContent='Calculando…';
+    return Promise.all(use.map(function(fr){return fcField(fr,w,key).then(function(f){return {t:fr.time,f:f};});}))
+    .then(function(arr){
+      if(mySeq!==fcSeq)return;
+      arr=arr.filter(function(s){return s.f;});
+      if(arr.length<2){fcMsg('No se pudo leer el radar para este punto');return;}
+      var keep={};use.forEach(function(fr){keep[fr.time+'|'+key]=1;});
+      for(var ck in fcCache)if(!keep[ck])delete fcCache[ck];
+      renderForecast(fcModel(arr,{x:w.cx,y:w.cy},Date.now()/1000),w.km);
+    }).catch(function(e){if(mySeq===fcSeq)fcMsg('Pronóstico no disponible');console.error('[lluvia] pronostico',e);});
+  }
+
   // ============ SISTEMA DE PARTICULAS (flujo animado) ============
   var particles=[], rafId=null, dpr=Math.min(window.devicePixelRatio||1,2);
   function particleCount(){var w=vecCanvas.clientWidth,h=vecCanvas.clientHeight;
@@ -476,7 +747,7 @@
     return loadRadar().then(function(){
       setSub('En vivo · actualizado '+new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}));
       $('stamp').textContent=new Date().toLocaleTimeString('es-MX');hideBanner();
-      return computeAdvection().then(renderVector);
+      return computeAdvection().then(renderVector).then(runForecast);
     }).catch(function(e){setSub('Radar no disponible · reintentando',true);showBanner('No se pudo cargar el radar. Se reintentará en un momento.');console.error('[lluvia]',e);});
   }
 
@@ -489,6 +760,7 @@
   var timer=setInterval(update,REFRESH_MS);
   $('tAuto').onchange=function(e){clearInterval(timer);if(e.target.checked)timer=setInterval(update,REFRESH_MS);};
   map.on('movestart',function(){stop();});
+  map.on('click',function(e){setFcPoint(e.latlng.lat,e.latlng.lng,'Punto elegido en el mapa','tap');});
   // al mover/hacer zoom, limpiar estelas viejas (las particulas re-fluyen desde el nuevo encuadre)
   map.on('move zoom viewreset',function(){clearVec();});
   map.on('moveend zoomend',function(){resizeVec();});
@@ -506,7 +778,7 @@
       userMk=L.marker([lat,lon],{icon:L.divIcon({className:'',html:'<div class="user-dot"></div>',iconSize:[18,18],iconAnchor:[9,9]})}).addTo(map);
       map.flyTo([lat,lon],13,{duration:.8});
       btn.classList.remove('loading');btn.classList.add('active');setTimeout(function(){btn.classList.remove('active');},1500);
-      renderVector();hideBanner();
+      setFcPoint(lat,lon,'Tu ubicación','user');renderVector();hideBanner();
     },function(err){btn.classList.remove('loading');
       showBanner(err.code===1?'Permiso de ubicación denegado. Actívalo en Ajustes → Safari.':'No se pudo obtener tu ubicación.');
     },{enableHighAccuracy:true,timeout:10000,maximumAge:60000});

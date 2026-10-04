@@ -13,6 +13,7 @@ Dashboard interactivo de **precipitación en tiempo real** para la Ciudad de Mé
 - **Radar de lluvia real** — reflectividad de precipitación de RainViewer, la misma que usan apps meteorológicas profesionales, refrescada cada 5 minutos.
 - **Línea de tiempo animable** — reproduce las últimas 2 horas de lluvia y frames de *nowcast* (pronóstico a corto plazo) para ver hacia dónde se mueve el sistema.
 - **Campo vectorial de dirección** — estima hacia dónde se desplaza la lluvia mediante flujo óptico entre los dos frames de radar más recientes.
+- **Pronóstico puntual (+10 a +40 min)** — para tu ubicación (o el punto que toques en el mapa) calcula probabilidad e intensidad de lluvia cada 10 min. Modelo ligero que corre en el navegador: toma los últimos ~9 frames de radar disponibles al entrar, estima el movimiento por flujo óptico local (ponderando los frames más recientes), advecta hacia atrás con incertidumbre creciente y aplica una tendencia de intensidad. Incluye un auto-chequeo (hindcast) que alimenta la etiqueta de confianza. No sustituye alertas oficiales.
 - **Mi ubicación** — botón de geolocalización con marcador "estás aquí" y círculo de precisión, para saber si te va a llover encima ahora mismo.
 - **Interfaz móvil-first** — mapa a pantalla completa con *bottom sheet* deslizable, glassmorphism sutil y switches estilo iOS. Respeta el notch y la barra inferior del iPhone.
 - **Modo pantalla completa** y capas conmutables (radar, flecha, nowcast, auto-actualización).
