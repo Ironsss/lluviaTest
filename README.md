@@ -1,4 +1,4 @@
-# 🌧️ Lluvia CDMX — Radar meteorológico en vivo
+# 🌧️ Lluvia CDMX y Estado de México — Radar meteorológico en vivo
 
 Dashboard interactivo de **precipitación en tiempo real** para la Ciudad de México. Muestra un radar de lluvia animable sobre las 16 alcaldías, con dirección del sistema, geolocalización y una interfaz estilo iOS nativo. Todo en un solo archivo HTML, sin build, sin dependencias que instalar y sin API keys.
 
