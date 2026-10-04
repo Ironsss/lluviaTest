@@ -26,11 +26,11 @@ El dashboard combina tres fuentes de datos en un mapa de [Leaflet](https://leafl
 
 ```
 ┌─────────────────────────────────────────────┐
-│  Etiquetas de calles y colonias (CARTO)      │  ← siempre encima
+│  Etiquetas de calles y colonias (Esri)      │  ← siempre encima
 ├─────────────────────────────────────────────┤
 │  Radar de lluvia (RainViewer, translúcido)   │  ← capa intermedia
 ├─────────────────────────────────────────────┤
-│  Mapa base oscuro sin etiquetas (CARTO)      │  ← fondo
+│  Mapa base oscuro sin etiquetas (Esri)      │  ← fondo
 └─────────────────────────────────────────────┘
       + flujo de dirección (canvas, desplazamiento observado por radar)
 ```
@@ -46,7 +46,7 @@ Todas gratuitas y sin API key para uso personal/educativo.
 | Fuente | Endpoint | Uso | Frecuencia |
 |---|---|---|---|
 | **RainViewer** | `api.rainviewer.com/public/weather-maps.json` | Radar de lluvia (capa principal + timeline) | 1 petición / 5 min |
-| **CARTO Basemaps** | `basemaps.cartocdn.com` | Tiles del mapa base y etiquetas | Bajo demanda (pan/zoom) |
+| **Esri Dark Gray** | `server.arcgisonline.com` | Tiles del mapa base y etiquetas | Bajo demanda (pan/zoom) |
 | **Geolocation API** | `navigator.geolocation` | Ubicación del usuario (local del dispositivo) | Al tocar el botón |
 
 ### Notas sobre las APIs
@@ -123,7 +123,7 @@ python3 -m http.server 8000
 Este proyecto usa datos de terceros bajo sus respectivas licencias:
 
 - **Radar:** [RainViewer](https://www.rainviewer.com/) — uso personal y educativo. Se requiere mencionar la fuente con enlace.
-- **Mapa base:** [CARTO](https://carto.com/) y [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors.
+- **Mapa base:** Esri World Dark Gray y [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors.
 
 El código de este repositorio se publica bajo licencia **MIT** (ver `LICENSE`).
 
