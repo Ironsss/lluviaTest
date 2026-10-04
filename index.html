@@ -201,6 +201,10 @@
   .rt-pin{flex:none;width:36px;height:36px;border-radius:10px;border:none;background:none;color:var(--dim);cursor:pointer;
     display:flex;align-items:center;justify-content:center}
   .rt-pin svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .rt-x{display:none;flex:none;width:26px;height:26px;border-radius:50%;border:none;background:rgba(255,255,255,.16);color:var(--text);
+    cursor:pointer;align-items:center;justify-content:center;padding:0}
+  .rt-x svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.6;stroke-linecap:round}
+  .rt-field input:not(:placeholder-shown) ~ .rt-x{display:flex}
   .rt-pin.loc{color:var(--accent)}
   .rt-pin.loading svg{animation:spin 1s linear infinite}
   .rt-pin.pick{color:var(--accent);background:rgba(76,201,240,.16)}
@@ -304,11 +308,15 @@
         </div>
         <div class="rt-field"><b>A</b>
           <input id="rtOin" type="text" placeholder="Origen: lugar o dirección" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search">
+          <button type="button" class="rt-x" id="rtOx" aria-label="Borrar origen"><svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></svg></button>
+          
           <button class="rt-pin loc" id="rtOloc" aria-label="Usar mi ubicación actual como origen" title="Mi ubicación actual"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3.2M12 18.3v3.2M2.5 12h3.2M18.3 12h3.2"/><circle cx="12" cy="12" r="7.5"/></svg></button>
           <button class="rt-pin" id="rtOpin" aria-label="Elegir origen en el mapa"><svg viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg></button></div>
         <div class="rt-sug" id="rtOsug"></div>
         <div class="rt-field"><b class="d">B</b>
           <input id="rtDin" type="text" placeholder="Destino: lugar o dirección" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search">
+          <button type="button" class="rt-x" id="rtDx" aria-label="Borrar destino"><svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></svg></button>
+          
           <button class="rt-pin" id="rtDpin" aria-label="Elegir destino en el mapa"><svg viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg></button></div>
         <div class="rt-sug" id="rtDsug"></div>
         <div class="rt-actions"><button id="rtSwap">⇅ Invertir</button><button id="rtClr">Limpiar</button></div>
@@ -937,7 +945,7 @@
   }
   function onType(w){
     var f=rtF[w],q=f.inp.value.trim();
-    if(rt[w]){rt[w]=null;} // al editar el texto se invalida el punto anterior
+    if(rt[w]){rt[w]=null;rtInvalidate();} // al editar el texto se invalida el punto y la ruta anteriores
     clearTimeout(f.timer);if(f.ctl)f.ctl.abort();
     if(q.length<3){showSug(w,[],null);if(w!=='a'||q.length)hideSug(w);return;}
     f.timer=setTimeout(function(){
@@ -981,6 +989,19 @@
     btn.classList.add('loading');rtF.a.inp.value='';rtF.a.inp.placeholder='Obteniendo tu ubicación…';hideSug('a');
     navigator.geolocation.getCurrentPosition(function(p){userLL={lat:p.coords.latitude,lon:p.coords.longitude};done();},fail,
       {enableHighAccuracy:true,timeout:10000,maximumAge:60000});
+  }
+  // borra el resultado de ruta mostrado (sin tocar los campos)
+  function rtInvalidate(){
+    rt.seq++;rt.res=null;rtClearLayer();
+    $('rtHead').textContent='';$('rtDeps').textContent='';$('rtStrip').textContent='';$('rtTicks').style.display='none';
+    $('rtNote').textContent='Escribe un lugar o dirección y elige una sugerencia (o usa el pin para tocar el mapa). La ruta sigue las calles reales.';
+    $('rtChip').classList.remove('on');
+  }
+  function rtClearField(w){
+    var f=rtF[w];clearTimeout(f.timer);if(f.ctl)f.ctl.abort();
+    f.inp.value='';hideSug(w);
+    if(rt[w]){rt[w]=null;rtInvalidate();}
+    f.inp.focus();if(w==='a')showSug('a',[],null);
   }
   function rtReset(){
     rt.a=rt.b=null;rt.res=null;rt.geo=null;rt.geoKey='';rt.pick=null;rt.seq++;rtClearLayer();
@@ -1094,6 +1115,11 @@
     }).catch(function(e){if(mySeq===rt.seq)$('rtHead').textContent='Ruta no disponible';console.error('[lluvia] ruta',e);});
   }
   $('rtOloc').onclick=useMyLocation;
+  ['a','b'].forEach(function(w){
+    var x=$(w==='a'?'rtOx':'rtDx');
+    x.addEventListener('mousedown',function(e){e.preventDefault();}); // no quita el foco del campo
+    x.addEventListener('click',function(){rtClearField(w);});
+  });
   $('rtOpin').onclick=function(){rtSetPick('a');};
   $('rtDpin').onclick=function(){rtSetPick('b');};
   $('rtSwap').onclick=function(){
