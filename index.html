@@ -456,16 +456,25 @@
     var r=hd(16,17);r.pane='roadPane';
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',r).addTo(map);
   }
-  var vecFailed=false;
-  function vecFallback(why){if(vecFailed)return;vecFailed=true;console.warn('[lluvia] mapa vectorial no disponible, respaldo raster',why);addRasterOverlays();}
+  var vecFailed=false,vecOk=false,vecGL=null;
+  function vecFallback(why){
+    if(vecFailed||vecOk)return; // una vez dibujado el vector nunca se cae al raster (duplicaria capas)
+    vecFailed=true;console.warn('[lluvia] mapa vectorial no disponible, respaldo raster',why);
+    if(vecGL){map.removeLayer(vecGL);vecGL=null;}
+    addRasterOverlays();
+  }
   map.createPane('vecPane');map.getPane('vecPane').style.zIndex=360;map.getPane('vecPane').style.pointerEvents='none';
   (function(){
     if(typeof maplibregl==='undefined'||!L.maplibreGL){vecFallback('librerias');return;}
     fetch('https://tiles.openfreemap.org/styles/liberty').then(function(r){if(!r.ok)throw new Error('estilo '+r.status);return r.json();}).then(function(st){
       var gl=L.maplibreGL({style:darkStyle(st),pane:'vecPane',interactive:false,attributionControl:false});
-      gl.addTo(map);
-      var mm=gl.getMaplibreMap();
-      mm.on('error',function(e){if(e&&e.error&&/WebGL|webgl|Style/.test(String(e.error.message||e.error)))vecFallback(e.error);});
+      gl.addTo(map);vecGL=gl;
+      var mm=gl.getMaplibreMap();window.__mlmap=mm;
+      mm.once('load',function(){vecOk=true;});
+      // solo errores fatales de inicializacion (WebGL) antes de que el mapa cargue; los errores de tiles/sprites se ignoran
+      mm.on('error',function(e){if(!vecOk&&e&&e.error&&/webgl|context|initialize/i.test(String(e.error.message||e.error)))vecFallback(e.error);});
+      // si tras 20 s sigue sin cargar, respaldo
+      setTimeout(function(){if(!vecOk)vecFallback('tiempo de espera');},20000);
     }).catch(function(e){vecFallback(e);});
   })();
   map.on('zoomend',function(){if(curLayer&&$('tRadar').checked)curLayer.setOpacity(frameOpacity(frames[pos]));});
