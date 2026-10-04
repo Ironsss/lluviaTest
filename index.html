@@ -57,6 +57,10 @@
   .fab svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
   .fab.loading svg{animation:spin 1s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
+  .fab.wind{display:none;flex-direction:column;gap:0;cursor:default;color:var(--accent2);border-color:rgba(94,224,208,.35);pointer-events:none}
+  .fab.wind.on{display:flex}
+  .fab.wind svg{width:19px;height:19px;stroke-width:2.2;transition:transform .6s}
+  .fab.wind span{font:700 9px var(--sys);margin-top:-1px;color:var(--text);font-variant-numeric:tabular-nums}
 
   /* ---------- timeline (floats above sheet) ---------- */
   .timeline{position:absolute;left:14px;right:14px;z-index:25;
@@ -186,14 +190,27 @@
     color:var(--text);font:600 13px var(--sys);cursor:pointer}
   .rt-modes button small{display:block;font-size:10px;color:var(--faint);font-weight:500;margin-top:1px}
   .rt-modes button.sel{border-color:var(--accent);background:rgba(76,201,240,.14);color:var(--accent)}
-  .rt-pts{display:flex;gap:8px;margin-bottom:8px}
-  .rt-pt{flex:1;display:flex;align-items:center;gap:9px;background:rgba(255,255,255,.05);border:1.5px solid var(--hair);
-    border-radius:12px;padding:10px;color:var(--text);font:500 13px var(--sys);cursor:pointer;text-align:left;min-width:0}
-  .rt-pt b{flex:none;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#04202e;font-size:12px;
+  .rt-field{display:flex;align-items:center;gap:9px;background:rgba(255,255,255,.06);border:1.5px solid var(--hair);
+    border-radius:12px;padding:4px 6px 4px 10px;margin-bottom:8px}
+  .rt-field:focus-within{border-color:var(--accent)}
+  .rt-field b{flex:none;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#04202e;font-size:12px;
     display:flex;align-items:center;justify-content:center}
-  .rt-pt b.d{background:#f72585;color:#fff}
-  .rt-pt span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .rt-pt.pick{border-color:var(--accent);box-shadow:0 0 0 3px rgba(76,201,240,.25)}
+  .rt-field b.d{background:#f72585;color:#fff}
+  .rt-field input{flex:1;min-width:0;background:none;border:none;outline:none;color:var(--text);font:500 16px var(--sys);padding:9px 2px}
+  .rt-field input::placeholder{color:var(--faint)}
+  .rt-pin{flex:none;width:36px;height:36px;border-radius:10px;border:none;background:none;color:var(--dim);cursor:pointer;
+    display:flex;align-items:center;justify-content:center}
+  .rt-pin svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .rt-pin.pick{color:var(--accent);background:rgba(76,201,240,.16)}
+  .rt-sug{display:none;margin:-2px 0 10px;background:rgba(255,255,255,.07);border-radius:12px;overflow:hidden}
+  .rt-sug.on{display:block}
+  .rt-s{display:block;width:100%;text-align:left;background:none;border:none;border-bottom:.5px solid var(--hair);
+    color:var(--text);padding:10px 12px;font-family:var(--sys);cursor:pointer}
+  .rt-s:last-child{border-bottom:none}
+  .rt-s .m{font-size:15px;font-weight:600}
+  .rt-s .s{font-size:12px;color:var(--faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rt-s.me .m{color:var(--accent)}
+  .rt-s.empty{font-size:13px;color:var(--faint);cursor:default}
   .rt-actions{display:flex;gap:8px;margin-bottom:14px}
   .rt-actions button{background:none;border:none;color:var(--accent);font:600 13px var(--sys);padding:4px 2px;cursor:pointer}
   .rt-actions button#rtClr{margin-left:auto;color:var(--dim)}
@@ -237,6 +254,7 @@
     <button class="fab" id="fabLoc" aria-label="Mi ubicación">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3.2M12 18.3v3.2M2.5 12h3.2M18.3 12h3.2"/><circle cx="12" cy="12" r="7.5"/></svg>
     </button>
+    <div class="fab wind" id="windFab" aria-label="Dirección de la lluvia"><svg viewBox="0 0 24 24" id="windArrow"><path d="M12 3v18M12 3l-5 5M12 3l5 5"/></svg><span id="windTxt"></span></div>
     <button class="fab" id="fabFs" aria-label="Pantalla completa">
       <svg viewBox="0 0 24 24" id="fsIcon"><path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M20 9V5.5A1.5 1.5 0 0 0 18.5 4H15M4 15v3.5A1.5 1.5 0 0 0 5.5 20H9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15"/></svg>
     </button>
@@ -278,20 +296,24 @@
       <div class="sec" id="rtSec">
         <div class="sec-h">Ruta · ¿cómo te afecta la lluvia?</div>
         <div class="rt-modes" id="rtModes">
-          <button data-m="walk" class="sel">Caminando<small>5 km/h</small></button>
-          <button data-m="bike">Bici<small>15 km/h</small></button>
-          <button data-m="car">Auto<small>30 km/h</small></button>
+          <button data-m="walk" class="sel">Caminando</button>
+          <button data-m="bike">Bici</button>
+          <button data-m="car">Auto</button>
         </div>
-        <div class="rt-pts">
-          <button class="rt-pt" id="rtO"><b>A</b><span id="rtOt">Elegir origen</span></button>
-          <button class="rt-pt" id="rtD"><b class="d">B</b><span id="rtDt">Elegir destino</span></button>
-        </div>
-        <div class="rt-actions"><button id="rtMe">Origen: mi ubicación</button><button id="rtClr">Limpiar</button></div>
+        <div class="rt-field"><b>A</b>
+          <input id="rtOin" type="text" placeholder="Origen: lugar o dirección" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search">
+          <button class="rt-pin" id="rtOpin" aria-label="Elegir origen en el mapa"><svg viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg></button></div>
+        <div class="rt-sug" id="rtOsug"></div>
+        <div class="rt-field"><b class="d">B</b>
+          <input id="rtDin" type="text" placeholder="Destino: lugar o dirección" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search">
+          <button class="rt-pin" id="rtDpin" aria-label="Elegir destino en el mapa"><svg viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg></button></div>
+        <div class="rt-sug" id="rtDsug"></div>
+        <div class="rt-actions"><button id="rtSwap">⇅ Invertir</button><button id="rtClr">Limpiar</button></div>
         <div class="fc-head" id="rtHead"></div>
         <div class="rt-deps" id="rtDeps"></div>
         <div class="rt-strip" id="rtStrip"></div>
         <div class="fc-ticks" id="rtTicks" style="display:none"><span id="rtT0"></span><span id="rtT1"></span><span id="rtT2"></span></div>
-        <div class="legend-note" id="rtNote">Elige origen (A) y destino (B). Es una línea recta, no una ruta de navegación: sirve para ver cuánta lluvia te tocaría en el trayecto.</div>
+        <div class="legend-note" id="rtNote">Escribe un lugar o dirección y elige una sugerencia (o usa el pin para tocar el mapa). La ruta sigue las calles reales.</div>
       </div>
 
       <div class="sec">
@@ -737,7 +759,10 @@
     if(!res.dry&&mv>=3){ // el flujo local (mas fino) alimenta tambien la flecha y la tarjeta "Se mueve a"
       advection={u:res.vel.u*600*km/25,v:res.vel.v*600*km/25,conf:1};
       $('pDir').textContent=dir;$('pSource').textContent='Radar';
-    }
+      var deg=(Math.atan2(res.vel.u,-res.vel.v)*180/Math.PI+360)%360;
+      $('windArrow').style.transform='rotate('+deg.toFixed(0)+'deg)';$('windTxt').textContent=Math.round(mv)+' km/h';
+      $('windFab').classList.add('on');
+    }else if(res.dry||mv<3)$('windFab').classList.remove('on');
     var txt=(res.dry?'No hay lluvia detectada en ~70 km a la redonda. ':
       (mv>=3?'Sistema hacia '+dir+' a ~'+Math.round(mv)+' km/h. ':'Sistema casi estacionario. '))+
       'Confianza: '+conf+' · '+res.frames+' frames de radar'+(res.lag>1200?' · datos con '+Math.round(res.lag/60)+' min de retraso':'')+'.';
@@ -769,10 +794,12 @@
   }
 
   // ============ RUTA: ¿como me afectara la lluvia de A a B? ============
-  // Linea recta A->B (no es navegacion): se muestrea la ruta, y cada tramo se evalua con el
-  // pronostico en el instante en que lo recorrerias. Compara salir ahora / +10 / +20 / +30 min.
-  var RT_DEPS=[0,10,20,30], RT_MODES={walk:5,bike:15,car:30};
-  var rt={a:null,b:null,mode:'walk',dep:0,pick:null,res:null,layer:null,seq:0};
+  // Ruta real por calles (OSRM publico de FOSSGIS: a pie / bici / auto) y lugares con buscador (Photon, OpenStreetMap).
+  // Cada tramo se evalua con el pronostico en el instante en que lo recorrerias; compara salir ahora / +10 / +20 / +30 min.
+  var RT_DEPS=[0,10,20,30], RT_SPEED={walk:5,bike:15,car:30}; // velocidades solo para el respaldo en linea recta
+  var RT_HOST={walk:'routed-foot',bike:'routed-bike',car:'routed-car'};
+  var PHOTON='https://photon.komoot.io/';
+  var rt={a:null,b:null,mode:'walk',dep:0,pick:null,res:null,layer:null,seq:0,geo:null,geoKey:'',fit:false};
   var userLL=null;
   function hav(a,b){var R=6371,r=Math.PI/180,dl=(b.lat-a.lat)*r,dn=(b.lon-a.lon)*r;
     var h=Math.sin(dl/2)*Math.sin(dl/2)+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dn/2)*Math.sin(dn/2);
@@ -780,38 +807,133 @@
   function fmtMin(m){m=Math.round(m);return m<60?m+' min':Math.floor(m/60)+' h '+(m%60?(m%60)+' min':'');}
   function segColor(a){return a.cut?'#6b7f92':(a.p<0.25?'#cfe6f5':catOf(a.cond).c);}
   function rtClearLayer(){if(rt.layer){map.removeLayer(rt.layer);rt.layer=null;}}
+
+  // --- geometria de la ruta: distancia acumulada, muestreo y cortes por fraccion ---
+  function rtPrep(coords){ // coords: [[lon,lat],...]
+    var pts=coords.map(function(c){return {lat:c[1],lon:c[0]};}),cum=[0];
+    for(var i=1;i<pts.length;i++)cum.push(cum[i-1]+hav(pts[i-1],pts[i]));
+    return {pts:pts,cum:cum,km:cum[cum.length-1]};
+  }
+  function rtAt(g,f){ // punto a la fraccion f (0..1) de la distancia total
+    var d=f*g.km,i=1;while(i<g.pts.length-1&&g.cum[i]<d)i++;
+    var d0=g.cum[i-1],d1=g.cum[i],t=d1>d0?(d-d0)/(d1-d0):0,a=g.pts[i-1],b=g.pts[i];
+    return {lat:a.lat+(b.lat-a.lat)*t,lon:a.lon+(b.lon-a.lon)*t,i:i};
+  }
+  function rtSlice(g,f0,f1){
+    var p0=rtAt(g,f0),p1=rtAt(g,f1),out=[[p0.lat,p0.lon]];
+    for(var i=p0.i;i<p1.i;i++)out.push([g.pts[i].lat,g.pts[i].lon]);
+    out.push([p1.lat,p1.lon]);return out;
+  }
+
+  // --- buscador de lugares con sugerencias ---
+  function placeLabel(pr){
+    var street=pr.street?(pr.street+(pr.housenumber?' '+pr.housenumber:'')):'';
+    var main=pr.name||street||pr.district||pr.city||'Lugar';
+    var sub=[(pr.name&&street)?street:'',pr.suburb||pr.district,pr.city||pr.county,pr.state].filter(function(x,i,a){return x&&x!==main&&a.indexOf(x)===i;}).join(', ');
+    return {main:main,sub:sub};
+  }
+  function uniq(list){var seen={};return list.filter(function(s){var k=s.main+'|'+s.sub;if(seen[k])return false;seen[k]=1;return true;});}
+  function geoSearch(q,signal){
+    var url=PHOTON+'api/?q='+encodeURIComponent(q)+'&limit=6&lat=19.4326&lon=-99.1332&bbox=-99.9,18.7,-98.4,20.1';
+    return fetch(url,{signal:signal}).then(function(r){if(!r.ok)throw new Error('geo '+r.status);return r.json();}).then(function(j){
+      return uniq((j.features||[]).map(function(f){var l=placeLabel(f.properties||{});
+        return {main:l.main,sub:l.sub,lat:f.geometry.coordinates[1],lon:f.geometry.coordinates[0]};}));
+    }).catch(function(e){
+      if(e&&e.name==='AbortError')throw e;
+      // respaldo: Nominatim (OpenStreetMap), en espanol
+      var u2='https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=6&accept-language=es&countrycodes=mx&viewbox=-99.9,20.1,-98.4,18.7&bounded=1&q='+encodeURIComponent(q);
+      return fetch(u2,{signal:signal}).then(function(r){if(!r.ok)throw new Error('geo2 '+r.status);return r.json();}).then(function(arr){
+        return uniq(arr.map(function(it){var a=it.address||{},parts=(it.display_name||'').split(', ');
+          return {main:it.name||parts[0],sub:[a.road,a.suburb||a.neighbourhood,a.city||a.town||a.state].filter(Boolean).join(', '),lat:parseFloat(it.lat),lon:parseFloat(it.lon)};}));
+      });
+    });
+  }
+  function reverseLabel(lat,lon){
+    return fetch(PHOTON+'reverse?lat='+lat+'&lon='+lon+'&limit=1').then(function(r){return r.json();}).then(function(j){
+      var f=j.features&&j.features[0];if(!f)return null;var l=placeLabel(f.properties||{});return l.main+(l.sub?', '+l.sub.split(',')[0]:'');
+    }).catch(function(){return null;});
+  }
+  var rtF={a:{inp:$('rtOin'),sug:$('rtOsug'),timer:null,ctl:null},b:{inp:$('rtDin'),sug:$('rtDsug'),timer:null,ctl:null}};
+  function hideSug(w){rtF[w].sug.classList.remove('on');rtF[w].sug.textContent='';}
+  function addSug(w,main,sub,cls,onpick){
+    var b=el('button','rt-s'+(cls?' '+cls:''));b.type='button';
+    b.appendChild(el('div','m',main));if(sub)b.appendChild(el('div','s',sub));
+    // pointerdown evita que el blur del input cierre la lista antes del toque
+    b.addEventListener('pointerdown',function(e){e.preventDefault();onpick();});
+    rtF[w].sug.appendChild(b);
+  }
+  function showSug(w,list,msg){
+    var sg=rtF[w].sug;sg.textContent='';
+    if(w==='a')addSug('a','Mi ubicación','Usar tu posición actual','me',useMyLocation);
+    list.forEach(function(s){addSug(w,s.main,s.sub,'',function(){rtSetPoint(w,s.lat,s.lon,s.main);});});
+    if(msg){var m=el('div','rt-s empty',msg);sg.appendChild(m);}
+    sg.classList.toggle('on',sg.childNodes.length>0);
+  }
+  function onType(w){
+    var f=rtF[w],q=f.inp.value.trim();
+    if(rt[w]){rt[w]=null;} // al editar el texto se invalida el punto anterior
+    clearTimeout(f.timer);if(f.ctl)f.ctl.abort();
+    if(q.length<3){showSug(w,[],null);if(w!=='a'||q.length)hideSug(w);return;}
+    f.timer=setTimeout(function(){
+      f.ctl=('AbortController' in window)?new AbortController():null;
+      geoSearch(q,f.ctl&&f.ctl.signal).then(function(list){
+        if(f.inp.value.trim()!==q)return;
+        showSug(w,list,list.length?null:'Sin resultados en CDMX y alrededores');
+      }).catch(function(e){if(e&&e.name==='AbortError')return;showSug(w,[],'No se pudo buscar. Revisa tu conexión.');});
+    },280);
+  }
+  ['a','b'].forEach(function(w){
+    var f=rtF[w];
+    f.inp.addEventListener('input',function(){onType(w);});
+    f.inp.addEventListener('focus',function(){if(!open)openSheet();if(w==='a'&&!f.inp.value)showSug('a',[],null);});
+    f.inp.addEventListener('blur',function(){setTimeout(function(){hideSug(w);},120);});
+    f.inp.addEventListener('keydown',function(e){
+      if(e.key==='Enter'){e.preventDefault();var first=f.sug.querySelector('.rt-s:not(.me):not(.empty)');if(first)first.dispatchEvent(new Event('pointerdown'));f.inp.blur();}
+    });
+  });
+
+  // --- seleccion de puntos ---
   function rtSetPick(m){
     rt.pick=(rt.pick===m)?null:m;
-    $('rtO').classList.toggle('pick',rt.pick==='a');$('rtD').classList.toggle('pick',rt.pick==='b');
+    $('rtOpin').classList.toggle('pick',rt.pick==='a');$('rtDpin').classList.toggle('pick',rt.pick==='b');
     var h=$('pickHint');
     if(rt.pick){h.textContent='Toca el mapa para elegir '+(rt.pick==='a'?'el origen (A)':'el destino (B)');h.classList.add('on');closeSheet();}
     else h.classList.remove('on');
   }
-  function rtSetPoint(which,lat,lon,label){
-    rt[which]={lat:lat,lon:lon,label:label};
-    $(which==='a'?'rtOt':'rtDt').textContent=label;
-    rt.pick=null;$('rtO').classList.remove('pick');$('rtD').classList.remove('pick');$('pickHint').classList.remove('on');
-    runRoute();
+  function rtSetPoint(w,lat,lon,label){
+    rt[w]={lat:lat,lon:lon,label:label};rtF[w].inp.value=label;hideSug(w);rtF[w].inp.blur();
+    rt.pick=null;$('rtOpin').classList.remove('pick');$('rtDpin').classList.remove('pick');$('pickHint').classList.remove('on');
+    rt.fit=true;runRoute();
+  }
+  function useMyLocation(){
+    function done(){rtSetPoint('a',userLL.lat,userLL.lon,'Mi ubicación');hideBanner();}
+    if(userLL){done();return;}
+    if(!navigator.geolocation){showBanner('Tu navegador no permite ubicación.');return;}
+    navigator.geolocation.getCurrentPosition(function(p){userLL={lat:p.coords.latitude,lon:p.coords.longitude};done();},
+      function(err){showBanner(err.code===1?'Permiso de ubicación denegado. Actívalo en Ajustes → Safari.':'No se pudo obtener tu ubicación.');},
+      {enableHighAccuracy:true,timeout:10000,maximumAge:60000});
   }
   function rtReset(){
-    rt.a=rt.b=null;rt.res=null;rt.pick=null;rt.seq++;rtClearLayer();
-    $('rtOt').textContent='Elegir origen';$('rtDt').textContent='Elegir destino';
-    ['rtO','rtD'].forEach(function(i){$(i).classList.remove('pick');});$('pickHint').classList.remove('on');
+    rt.a=rt.b=null;rt.res=null;rt.geo=null;rt.geoKey='';rt.pick=null;rt.seq++;rtClearLayer();
+    rtF.a.inp.value='';rtF.b.inp.value='';hideSug('a');hideSug('b');
+    ['rtOpin','rtDpin'].forEach(function(i){$(i).classList.remove('pick');});$('pickHint').classList.remove('on');
     $('rtHead').textContent='';$('rtDeps').textContent='';$('rtStrip').textContent='';$('rtTicks').style.display='none';
-    $('rtNote').textContent='Elige origen (A) y destino (B). Es una línea recta, no una ruta de navegación: sirve para ver cuánta lluvia te tocaría en el trayecto.';
+    $('rtNote').textContent='Escribe un lugar o dirección y elige una sugerencia (o usa el pin para tocar el mapa). La ruta sigue las calles reales.';
     $('rtChip').classList.remove('on');
   }
+
+  // --- dibujo ---
   function rtDraw(){
     rtClearLayer();
     if(!rt.res||!rt.a||!rt.b)return;
-    var r=rt.res.opts[rt.dep],g=L.layerGroup(),n=r.segs.length,A=rt.a,B=rt.b;
-    function ll(t){return [A.lat+(B.lat-A.lat)*t,A.lon+(B.lon-A.lon)*t];}
-    L.polyline([ll(0),ll(1)],{color:'#0a1420',weight:9,opacity:.55,interactive:false,lineCap:'round'}).addTo(g);
+    var r=rt.res.opts[rt.dep],g=L.layerGroup(),n=r.segs.length,geo=rt.res.geo;
+    var full=geo.pts.map(function(p){return [p.lat,p.lon];});
+    L.polyline(full,{color:'#0a1420',weight:9,opacity:.6,interactive:false,lineCap:'round',lineJoin:'round'}).addTo(g);
     r.segs.forEach(function(sg,i){
-      L.polyline([ll(i/n),ll((i+1)/n)],{color:segColor(sg),weight:5,opacity:1,interactive:false,lineCap:'butt'}).addTo(g);
+      L.polyline(rt.res.slices[i],{color:segColor(sg),weight:5,opacity:1,interactive:false,lineCap:'butt',lineJoin:'round'}).addTo(g);
     });
-    L.circleMarker([A.lat,A.lon],{radius:8,color:'#fff',weight:2.5,fillColor:'#4cc9f0',fillOpacity:1,interactive:false}).addTo(g);
-    L.circleMarker([B.lat,B.lon],{radius:8,color:'#fff',weight:2.5,fillColor:'#f72585',fillOpacity:1,interactive:false}).addTo(g);
+    L.circleMarker([rt.a.lat,rt.a.lon],{radius:8,color:'#fff',weight:2.5,fillColor:'#4cc9f0',fillOpacity:1,interactive:false}).addTo(g);
+    L.circleMarker([rt.b.lat,rt.b.lon],{radius:8,color:'#fff',weight:2.5,fillColor:'#f72585',fillOpacity:1,interactive:false}).addTo(g);
     g.addTo(map);rt.layer=g;
   }
   function rtHeadline(r){
@@ -824,7 +946,6 @@
     var R=rt.res;if(!R)return;
     var sel=R.opts[rt.dep];
     $('rtHead').textContent=rtHeadline(sel);
-    // opciones de salida
     var deps=$('rtDeps');deps.textContent='';
     var bestI=0;R.opts.forEach(function(o,i){if(o.intMin<R.opts[bestI].intMin-1e-9)bestI=i;});
     var fullCov=R.opts.every(function(o){return o.covMin>=o.totMin-0.5;});
@@ -839,7 +960,6 @@
       card.onclick=function(){rt.dep=i;rtRender();rtDraw();};
       deps.appendChild(card);
     });
-    // franja de exposicion a lo largo del trayecto
     var st=$('rtStrip');st.textContent='';
     sel.segs.forEach(function(sg){var b=el('div','seg');b.style.background=segColor(sg);if(sg.cut)b.classList.add('cut');st.appendChild(b);});
     $('rtTicks').style.display='';$('rtT0').textContent='A · '+fmtTime(R.now+RT_DEPS[rt.dep]*60);
@@ -848,57 +968,73 @@
     var note=(improves?'Salir en '+(bestI===0?'este momento':'+'+RT_DEPS[bestI]+' min')+' reduce la lluvia a ~'+fmtMin(R.opts[bestI].wetMin)+' (vs ~'+fmtMin(R.opts[0].wetMin)+' si sales ahora). ':
       (R.opts[0].intMin>0.5?'Esperar no cambia mucho el resultado. ':''));
     if(sel.covMin<sel.totMin-0.5)note+='Pronóstico solo hasta 60 min: el tramo final (gris) no tiene estimación, por eso no se comparan horas de salida. ';
-    note+='Confianza: '+R.conf+'. Cada tramo se evalúa a la hora en que lo recorrerías.';
+    note+=(R.straight?'No se pudo obtener la ruta por calles: se muestra una línea recta. ':'Ruta por calles'+(rt.mode==='car'?' (tiempo sin tráfico)':'')+'. ')+'Confianza: '+R.conf+'.';
     $('rtNote').textContent=note;
-    // chip flotante sobre el mapa
     var chip=$('rtChip');chip.textContent=fmtMin(sel.totMin)+' · '+(sel.wetMin<0.5?'sin lluvia':'~'+fmtMin(sel.wetMin)+' con lluvia');
     chip.style.borderColor=sel.wetMin<0.5?'rgba(94,224,208,.5)':catOf(sel.maxCond||0.2).c;chip.classList.add('on');
   }
+
+  // --- ruta real (con respaldo en linea recta) ---
+  function fetchRoute(a,b,mode,retry){
+    var url='https://routing.openstreetmap.de/'+RT_HOST[mode]+'/route/v1/driving/'+a.lon+','+a.lat+';'+b.lon+','+b.lat+'?overview=full&geometries=geojson';
+    var ctl=('AbortController' in window)?new AbortController():null,to=setTimeout(function(){if(ctl)ctl.abort();},12000);
+    return fetch(url,{signal:ctl&&ctl.signal}).then(function(r){if(!r.ok)throw new Error('ruta '+r.status);return r.json();}).then(function(j){
+      clearTimeout(to);
+      if(j.code!=='Ok'||!j.routes||!j.routes.length)throw new Error('sin ruta');
+      var r0=j.routes[0];return {geo:rtPrep(r0.geometry.coordinates),durMin:r0.duration/60,straight:false};
+    }).catch(function(e){
+      clearTimeout(to);
+      if(!retry)return new Promise(function(res){setTimeout(res,700);}).then(function(){return fetchRoute(a,b,mode,true);});
+      console.warn('[lluvia] ruta real no disponible, linea recta',e);
+      var g=rtPrep([[a.lon,a.lat],[b.lon,b.lat]]);return {geo:g,durMin:g.km/RT_SPEED[mode]*60,straight:true};
+    });
+  }
   function runRoute(){
     var mySeq=++rt.seq;
-    if(!rt.a||!rt.b){return Promise.resolve();}
-    var km=hav(rt.a,rt.b);
-    if(km<0.15){$('rtHead').textContent='Origen y destino están muy cerca';return Promise.resolve();}
+    if(!rt.a||!rt.b)return Promise.resolve();
+    if(hav(rt.a,rt.b)<0.1){$('rtHead').textContent='Origen y destino están muy cerca';return Promise.resolve();}
     if(!frames.length||pastCount<2){$('rtHead').textContent='Esperando datos del radar…';return Promise.resolve();}
-    var mid={lat:(rt.a.lat+rt.b.lat)/2,lon:(rt.a.lon+rt.b.lon)/2};
-    mid.lat=Math.round(mid.lat*50)/50;mid.lon=Math.round(mid.lon*50)/50;
-    var w=fcWindow(mid.lat,mid.lon),key='r'+mid.lat.toFixed(2)+','+mid.lon.toFixed(2);
-    var ca=fcCell(w,rt.a.lat,rt.a.lon),cb=fcCell(w,rt.b.lat,rt.b.lon);
-    if(Math.max(Math.abs(ca.x-NG/2),Math.abs(ca.y-NG/2),Math.abs(cb.x-NG/2),Math.abs(cb.y-NG/2))>NG/2-3){
-      $('rtHead').textContent='La ruta es demasiado larga (máx. ~60 km)';$('rtDeps').textContent='';$('rtStrip').textContent='';return Promise.resolve();}
-    $('rtHead').textContent='Calculando…';
-    var use=frames.slice(0,pastCount).slice(-FC_FRAMES);
-    return Promise.all(use.map(function(fr){return fcField(fr,w,key).then(function(f){return {t:fr.time,f:f};});}))
-    .then(function(arr){
+    $('rtHead').textContent='Calculando ruta…';
+    var gk=[rt.a.lat,rt.a.lon,rt.b.lat,rt.b.lon,rt.mode].join(',');
+    var getGeo=(rt.geo&&rt.geoKey===gk)?Promise.resolve(rt.geo):fetchRoute(rt.a,rt.b,rt.mode).then(function(r){if(!r.straight){rt.geo=r;rt.geoKey=gk;}return r;});
+    return getGeo.then(function(route){
       if(mySeq!==rt.seq)return;
-      arr=arr.filter(function(s){return s.f;});
-      if(arr.length<2){$('rtHead').textContent='No se pudo leer el radar para esta ruta';return;}
-      var now=Date.now()/1000,S=fcPrepare(arr,{x:w.cx,y:w.cy},now);
-      var n=Math.max(8,Math.min(60,Math.ceil(km/0.5))),pts=[];
-      for(var i=0;i<n;i++){var t=(i+0.5)/n;pts.push({x:ca.x+(cb.x-ca.x)*t,y:ca.y+(cb.y-ca.y)*t});}
-      var speed=RT_MODES[rt.mode];
-      var opts=RT_DEPS.map(function(d){return rtExposure(S,pts,km,speed,d,now);});
-      var conf=S.q<0.3?'Baja':(S.skill==null?'Media':(S.skill>=0.45?'Alta':(S.skill>=0.2?'Media':'Baja')));
-      rt.res={opts:opts,now:now,km:km,conf:conf};
-      rtRender();rtDraw();
+      var g=route.geo,minLat=90,maxLat=-90,minLon=180,maxLon=-180;
+      g.pts.forEach(function(p){minLat=Math.min(minLat,p.lat);maxLat=Math.max(maxLat,p.lat);minLon=Math.min(minLon,p.lon);maxLon=Math.max(maxLon,p.lon);});
+      var mid={lat:Math.round((minLat+maxLat)/2*50)/50,lon:Math.round((minLon+maxLon)/2*50)/50};
+      var w=fcWindow(mid.lat,mid.lon),key='r'+mid.lat.toFixed(2)+','+mid.lon.toFixed(2);
+      var c1=fcCell(w,minLat,minLon),c2=fcCell(w,maxLat,maxLon),lim=NG/2-3;
+      if(Math.max(Math.abs(c1.x-NG/2),Math.abs(c1.y-NG/2),Math.abs(c2.x-NG/2),Math.abs(c2.y-NG/2))>lim){
+        $('rtHead').textContent='La ruta es demasiado larga para pronosticarla (máx. ~60 km de extensión)';$('rtDeps').textContent='';$('rtStrip').textContent='';return;}
+      var use=frames.slice(0,pastCount).slice(-FC_FRAMES);
+      return Promise.all(use.map(function(fr){return fcField(fr,w,key).then(function(f){return {t:fr.time,f:f};});})).then(function(arr){
+        if(mySeq!==rt.seq)return;
+        arr=arr.filter(function(s){return s.f;});
+        if(arr.length<2){$('rtHead').textContent='No se pudo leer el radar para esta ruta';return;}
+        var now=Date.now()/1000,S=fcPrepare(arr,{x:w.cx,y:w.cy},now);
+        var n=Math.max(10,Math.min(80,Math.ceil(g.km/0.4))),pts=[],slices=[];
+        for(var i=0;i<n;i++){var p=rtAt(g,(i+0.5)/n),c=fcCell(w,p.lat,p.lon);pts.push({x:c.x,y:c.y});slices.push(rtSlice(g,i/n,(i+1)/n));}
+        var speed=g.km/(route.durMin/60);
+        var opts=RT_DEPS.map(function(d){return rtExposure(S,pts,g.km,speed,d,now);});
+        var conf=S.q<0.3?'Baja':(S.skill==null?'Media':(S.skill>=0.45?'Alta':(S.skill>=0.2?'Media':'Baja')));
+        rt.res={opts:opts,now:now,km:g.km,conf:conf,geo:g,slices:slices,straight:route.straight};
+        rtRender();rtDraw();
+        if(rt.fit){rt.fit=false;closeSheet();
+          map.fitBounds([[minLat,minLon],[maxLat,maxLon]],{paddingTopLeft:[28,130],paddingBottomRight:[28,330],maxZoom:15});}
+      });
     }).catch(function(e){if(mySeq===rt.seq)$('rtHead').textContent='Ruta no disponible';console.error('[lluvia] ruta',e);});
   }
-  $('rtO').onclick=function(){rtSetPick('a');};
-  $('rtD').onclick=function(){rtSetPick('b');};
-  $('rtMe').onclick=function(){
-    if(userLL){rtSetPoint('a',userLL.lat,userLL.lon,'Mi ubicación');return;}
-    if(!navigator.geolocation){showBanner('Tu navegador no permite ubicación.');return;}
-    navigator.geolocation.getCurrentPosition(function(p){
-      userLL={lat:p.coords.latitude,lon:p.coords.longitude};rtSetPoint('a',userLL.lat,userLL.lon,'Mi ubicación');hideBanner();
-    },function(err){showBanner(err.code===1?'Permiso de ubicación denegado. Actívalo en Ajustes → Safari.':'No se pudo obtener tu ubicación.');},
-    {enableHighAccuracy:true,timeout:10000,maximumAge:60000});
-  };
+  $('rtOpin').onclick=function(){rtSetPick('a');};
+  $('rtDpin').onclick=function(){rtSetPick('b');};
+  $('rtSwap').onclick=function(){
+    var t=rt.a;rt.a=rt.b;rt.b=t;var tv=rtF.a.inp.value;rtF.a.inp.value=rtF.b.inp.value;rtF.b.inp.value=tv;
+    rt.fit=true;if(rt.a&&rt.b)runRoute();};
   $('rtClr').onclick=rtReset;
   $('rtChip').onclick=function(){openSheet();};
   Array.prototype.forEach.call(document.querySelectorAll('#rtModes button'),function(b){
     b.onclick=function(){rt.mode=b.getAttribute('data-m');
       Array.prototype.forEach.call(document.querySelectorAll('#rtModes button'),function(x){x.classList.toggle('sel',x===b);});
-      if(rt.a&&rt.b)runRoute();};
+      if(rt.a&&rt.b){rt.fit=true;runRoute();}};
   });
 
   // ============ SISTEMA DE PARTICULAS (flujo animado) ============
@@ -923,10 +1059,10 @@
     var w=vecCanvas.clientWidth,h=vecCanvas.clientHeight;
     // estela: en vez de borrar, pintamos un velo semitransparente -> deja rastro que se desvanece
     vctx.globalCompositeOperation='destination-out';
-    vctx.fillStyle='rgba(0,0,0,0.14)';
+    vctx.fillStyle='rgba(0,0,0,0.2)';
     vctx.fillRect(0,0,w,h);
     vctx.globalCompositeOperation='source-over';
-    vctx.lineWidth=1.3; vctx.lineCap='round';
+    vctx.lineCap='round';
     for(var i=0;i<particles.length;i++){
       var p=particles[i];
       var f=fieldAtScreen(p.x,p.y);
@@ -939,9 +1075,11 @@
       p.x+=nx*v*3; p.y+=ny*v*3; p.age++;
       // color por magnitud
       var t=Math.min(1,mag/40);
-      var col=mag<6?'rgba(127,176,200,':(t<0.5?'rgba(76,201,240,':'rgba(94,224,208,');
-      var alpha=(0.25+t*0.6).toFixed(2);
-      vctx.strokeStyle=col+alpha+')';
+      // halo oscuro + trazo claro: se distingue sobre el radar de cualquier color y sobre el mapa claro
+      var alpha=(0.55+t*0.3).toFixed(2);
+      vctx.lineWidth=3;vctx.strokeStyle='rgba(6,14,24,0.22)';
+      vctx.beginPath(); vctx.moveTo(x0,y0); vctx.lineTo(p.x,p.y); vctx.stroke();
+      vctx.lineWidth=1.6;vctx.strokeStyle='rgba(235,250,255,'+alpha+')';
       vctx.beginPath(); vctx.moveTo(x0,y0); vctx.lineTo(p.x,p.y); vctx.stroke();
       // morir si sale de pantalla o agota vida
       if(p.age>p.life||p.x<-5||p.y<-5||p.x>w+5||p.y>h+5) spawn(p);
@@ -993,7 +1131,9 @@
   $('tAuto').onchange=function(e){clearInterval(timer);if(e.target.checked)timer=setInterval(update,REFRESH_MS);};
   map.on('movestart',function(){stop();});
   map.on('click',function(e){
-    if(rt.pick){var wh=rt.pick;rtSetPoint(wh,e.latlng.lat,e.latlng.lng,wh==='a'?'Punto A en el mapa':'Punto B en el mapa');return;}
+    if(rt.pick){var wh=rt.pick,la=e.latlng.lat,lo=e.latlng.lng;
+      rtSetPoint(wh,la,lo,'Punto en el mapa');
+      reverseLabel(la,lo).then(function(t){if(t&&rt[wh]&&rt[wh].lat===la){rt[wh].label=t;rtF[wh].inp.value=t;}});return;}
     setFcPoint(e.latlng.lat,e.latlng.lng,'Punto elegido en el mapa','tap');
   });
   // al mover/hacer zoom, limpiar estelas viejas (las particulas re-fluyen desde el nuevo encuadre)
