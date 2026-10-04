@@ -269,7 +269,7 @@
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3.2M12 18.3v3.2M2.5 12h3.2M18.3 12h3.2"/><circle cx="12" cy="12" r="7.5"/></svg>
     </button>
     <div class="fab wind" id="windFab" aria-label="Dirección de la lluvia"><svg viewBox="0 0 24 24" id="windArrow"><path d="M12 3v18M12 3l-5 5M12 3l5 5"/></svg><span id="windTxt"></span></div>
-    <button class="fab" id="fabFs" aria-label="Pantalla completa">
+    <button class="fab" id="fabFs" aria-label="Pantalla completa" title="Pantalla completa">
       <svg viewBox="0 0 24 24" id="fsIcon"><path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M20 9V5.5A1.5 1.5 0 0 0 18.5 4H15M4 15v3.5A1.5 1.5 0 0 0 5.5 20H9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15"/></svg>
     </button>
   </div>
@@ -1392,6 +1392,9 @@
   // ---- fullscreen ----
   var fsIn='<path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M20 9V5.5A1.5 1.5 0 0 0 18.5 4H15M4 15v3.5A1.5 1.5 0 0 0 5.5 20H9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15"/>';
   var fsOut='<path d="M9 4.5V8A1.5 1.5 0 0 1 7.5 9.5H4M15 4.5V8a1.5 1.5 0 0 0 1.5 1.5H20M9 19.5V16a1.5 1.5 0 0 0-1.5-1.5H4M15 19.5V16a1.5 1.5 0 0 1 1.5-1.5H20"/>';
+  // en iPhone/Safari no existe pantalla completa para paginas web: el boton no haria nada util, asi que se oculta
+  if(!(document.documentElement.requestFullscreen||document.documentElement.webkitRequestFullscreen)||
+     !(document.fullscreenEnabled||document.webkitFullscreenEnabled))$('fabFs').style.display='none';
   $('fabFs').onclick=function(){
     var el=document.documentElement,isFs=document.fullscreenElement||document.webkitFullscreenElement;
     if(!isFs){if(el.requestFullscreen)el.requestFullscreen().catch(fsFallback);else if(el.webkitRequestFullscreen)el.webkitRequestFullscreen();else fsFallback();}
