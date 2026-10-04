@@ -350,15 +350,18 @@
   var CENTER=[19.36,-99.15], REFRESH_MS=300000;
   var RADAR_API='https://api.rainviewer.com/public/weather-maps.json';
   var TILE_SIZE=(window.devicePixelRatio>=2)?512:256;
-  var RADAR_OPACITY=0.45;
+  var RADAR_OPACITY=0.68;
 
   var map=L.map('map',{zoomControl:false,attributionControl:false,minZoom:8,maxZoom:16,zoomSnap:.5}).setView(CENTER,10);
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',{maxZoom:16,maxNativeZoom:16}).addTo(map);
   map.createPane('radarPane');map.getPane('radarPane').style.zIndex=350;map.getPane('radarPane').style.pointerEvents='none';
   // blur muy sutil: difumina las fronteras cuadradas entre celdas del radar sin perder forma
-  map.getPane('radarPane').style.filter='blur(1.5px)';
+  map.getPane('radarPane').style.filter='blur(1.5px) saturate(1.3) contrast(1.08)';
+  // mapa base mas claro y con mas contraste para distinguir calles bajo el radar
+  map.getPane('tilePane').style.filter='brightness(1.45) contrast(1.7)';
   map.createPane('labelPane');map.getPane('labelPane').style.zIndex=360;map.getPane('labelPane').style.pointerEvents='none';
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',{maxZoom:16,maxNativeZoom:16,pane:'labelPane'}).addTo(map);
+  map.getPane('labelPane').style.filter='brightness(1.3) contrast(1.15)';
   map.setMaxBounds([[18.7,-99.9],[20.1,-98.4]]);
 
   var host='',frames=[],pastCount=0,pos=0,curLayer=null,layerCache={},playing=false,playTimer=null,loading=false;
