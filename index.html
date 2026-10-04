@@ -169,6 +169,44 @@
   .fc-chart .col.first{margin-left:6px}
   .fc-ticks{display:flex;justify-content:space-between;font-size:10px;color:var(--faint);margin:5px 0 8px;font-variant-numeric:tabular-nums}
 
+  /* ruta */
+  .pick-hint{position:absolute;top:calc(var(--safe-top) + 70px);left:50%;transform:translateX(-50%);z-index:50;display:none;
+    background:rgba(18,28,42,.92);border:.5px solid rgba(76,201,240,.5);color:var(--text);padding:10px 16px;border-radius:14px;
+    font-size:13px;font-weight:600;max-width:80%;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.35)}
+  .pick-hint.on{display:block}
+  .rt-chip{position:absolute;top:calc(var(--safe-top) + 74px);left:16px;z-index:34;display:none;
+    background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);color:var(--text);
+    border:1.5px solid var(--hair);border-radius:14px;padding:7px 12px;font:600 12px var(--sys);cursor:pointer}
+  .rt-chip.on{display:block}
+  .rt-modes{display:flex;gap:8px;margin-bottom:10px}
+  .rt-modes button{flex:1;background:rgba(255,255,255,.05);border:1.5px solid var(--hair);border-radius:12px;padding:8px 4px;
+    color:var(--text);font:600 13px var(--sys);cursor:pointer}
+  .rt-modes button small{display:block;font-size:10px;color:var(--faint);font-weight:500;margin-top:1px}
+  .rt-modes button.sel{border-color:var(--accent);background:rgba(76,201,240,.14);color:var(--accent)}
+  .rt-pts{display:flex;gap:8px;margin-bottom:8px}
+  .rt-pt{flex:1;display:flex;align-items:center;gap:9px;background:rgba(255,255,255,.05);border:1.5px solid var(--hair);
+    border-radius:12px;padding:10px;color:var(--text);font:500 13px var(--sys);cursor:pointer;text-align:left;min-width:0}
+  .rt-pt b{flex:none;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#04202e;font-size:12px;
+    display:flex;align-items:center;justify-content:center}
+  .rt-pt b.d{background:#f72585;color:#fff}
+  .rt-pt span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rt-pt.pick{border-color:var(--accent);box-shadow:0 0 0 3px rgba(76,201,240,.25)}
+  .rt-actions{display:flex;gap:8px;margin-bottom:14px}
+  .rt-actions button{background:none;border:none;color:var(--accent);font:600 13px var(--sys);padding:4px 2px;cursor:pointer}
+  .rt-actions button#rtClr{margin-left:auto;color:var(--dim)}
+  .rt-deps{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+  .rt-dep{position:relative;background:rgba(255,255,255,.05);border:1.5px solid var(--hair);border-radius:12px;padding:9px 4px;
+    text-align:center;color:var(--text);font-family:var(--sys);cursor:pointer}
+  .rt-dep.sel{border-color:var(--accent);background:rgba(76,201,240,.1)}
+  .rt-dep .k{font-size:11px;color:var(--dim);font-weight:600}
+  .rt-dep .v{font-size:14px;font-weight:700;margin:4px 0 2px;font-variant-numeric:tabular-nums}
+  .rt-dep .t{font-size:10px;color:var(--faint);font-variant-numeric:tabular-nums}
+  .rt-dep .best{position:absolute;top:-8px;left:50%;transform:translateX(-50%);background:var(--accent2);color:#062a26;
+    font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:6px}
+  .rt-strip{display:flex;height:14px;border-radius:7px;overflow:hidden;background:rgba(255,255,255,.08)}
+  .rt-strip .seg{flex:1}
+  .rt-strip .seg.cut{opacity:.5;background-image:repeating-linear-gradient(135deg,rgba(0,0,0,.35) 0 3px,transparent 3px 6px)}
+
   @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
   @media (min-width:821px){
     /* en escritorio: sheet fija abierta como panel lateral */
@@ -202,6 +240,8 @@
   </div>
 
   <div class="banner" id="banner"></div>
+  <div class="pick-hint" id="pickHint"></div>
+  <button class="rt-chip" id="rtChip"></button>
 
   <div class="timeline" id="timeline">
     <div class="tl-head">
@@ -230,6 +270,25 @@
         <div class="fc-chart" id="fcChart"></div>
         <div class="fc-ticks"><span id="fcT0">−80 min</span><span>ahora</span><span>+40 min</span></div>
         <div class="legend-note" id="fcNote">Toca el mapa o usa tu ubicación para elegir el punto. Modelo ligero con el movimiento observado en el radar; no sustituye alertas oficiales.</div>
+      </div>
+
+      <div class="sec" id="rtSec">
+        <div class="sec-h">Ruta · ¿cómo te afecta la lluvia?</div>
+        <div class="rt-modes" id="rtModes">
+          <button data-m="walk" class="sel">Caminando<small>5 km/h</small></button>
+          <button data-m="bike">Bici<small>15 km/h</small></button>
+          <button data-m="car">Auto<small>30 km/h</small></button>
+        </div>
+        <div class="rt-pts">
+          <button class="rt-pt" id="rtO"><b>A</b><span id="rtOt">Elegir origen</span></button>
+          <button class="rt-pt" id="rtD"><b class="d">B</b><span id="rtDt">Elegir destino</span></button>
+        </div>
+        <div class="rt-actions"><button id="rtMe">Origen: mi ubicación</button><button id="rtClr">Limpiar</button></div>
+        <div class="fc-head" id="rtHead"></div>
+        <div class="rt-deps" id="rtDeps"></div>
+        <div class="rt-strip" id="rtStrip"></div>
+        <div class="fc-ticks" id="rtTicks" style="display:none"><span id="rtT0"></span><span id="rtT1"></span><span id="rtT2"></span></div>
+        <div class="legend-note" id="rtNote">Elige origen (A) y destino (B). Es una línea recta, no una ruta de navegación: sirve para ver cuánta lluvia te tocaría en el trayecto.</div>
       </div>
 
       <div class="sec">
@@ -502,8 +561,9 @@
     }
     return {p:sw1/sw,cond:sw1?swi/sw1:0,mean:sm/sw};
   }
-  // series: [{t,f}] de viejo a nuevo; c: celda del punto; nowSec: ahora (s)
-  function fcModel(series,c,nowSec){
+  // series: [{t,f}] de viejo a nuevo; c: celda de referencia; nowSec: ahora (s)
+  // fcPrepare estima movimiento, tendencia y habilidad una sola vez; fcAt evalua cualquier punto/instante.
+  function fcPrepare(series,c,nowSec){
     var n=series.length,last=series[n-1],t0=last.t,pms=[],i;
     for(i=1;i<n;i++){
       var dt=series[i].t-series[i-1].t;if(dt<=0||dt>1500)continue;
@@ -516,11 +576,11 @@
     if(n>=3){
       var prior=pms.filter(function(p){return p.i<n-1;}),vh=fcCombine(prior);
       if(vh){
-        var pf=series[n-2].f,cf=last.f,dtl=last.t-series[n-2].t,ea=0,ep=0,en=0,act=0;
+        var pf=series[n-2].f,cf=last.f,dtl=last.t-series[n-2].t,ea=0,ep=0,act=0;
         for(var y=0;y<NG;y++)for(var x=0;x<NG;x++){
           var ddx=x-c.x,ddy=y-c.y;if(ddx*ddx+ddy*ddy>16*16)continue;
           var o=cf[y*NG+x],a=bil(pf,x-vh.u*dtl,y-vh.v*dtl),pp=pf[y*NG+x];
-          ea+=(o-a)*(o-a);ep+=(o-pp)*(o-pp);en++;act+=o+pp;
+          ea+=(o-a)*(o-a);ep+=(o-pp)*(o-pp);act+=o+pp;
         }
         if(act>2&&ep>1e-6)skill=clamp(1-ea/ep,0,1);
       }
@@ -535,18 +595,40 @@
       var avg=0;for(i=0;i<ms.length;i++)avg+=ms[i];avg/=ms.length;
       g=clamp((ms[ms.length-1]-ms[0])/(ms.length-1)/(avg+0.04),-0.3,0.3);
     }
-    var cps=Math.sqrt(vel.u*vel.u+vel.v*vel.v),leads=[];
+    var peak=0;for(i=0;i<last.f.length;i++)if(last.f[i]>peak)peak=last.f[i];
+    return {series:series,n:n,last:last,t0:t0,vel:vel,cps:Math.sqrt(vel.u*vel.u+vel.v*vel.v),q:q,skill:skill,g:g,
+            dry:peak<WET,lag:nowSec-t0};
+  }
+  // lluvia esperada en la celda (x,y) en el instante tAbs (s unix)
+  function fcAt(S,x,y,tAbs){
+    var tau=Math.max(0,tAbs-S.t0),k=tau/FC_STEP;
+    var r=Math.min(14,2+0.6*k+0.2*S.cps*tau);               // incertidumbre crece con el horizonte
+    var s=fcDisc(S.last.f,x-S.vel.u*tau,y-S.vel.v*tau,r);
+    var fac=clamp(1+S.g*k*Math.exp(-k/3.5),0.35,1.9);
+    var cond=Math.min(1,s.cond*fac),p=Math.min(1,s.p*clamp(0.5+0.5*fac,0.6,1.05));
+    return {p:p,cond:cond,score:p*cond};
+  }
+  function fcModel(series,c,nowSec){
+    var S=fcPrepare(series,c,nowSec),leads=[];
     for(var j=1;j<=FC_LEAD;j++){
-      var tau=nowSec+j*FC_STEP-t0,k=tau/FC_STEP;
-      var r=Math.min(14,2+0.6*k+0.2*cps*tau);               // incertidumbre crece con el horizonte
-      var s=fcDisc(last.f,c.x-vel.u*tau,c.y-vel.v*tau,r);
-      var fac=clamp(1+g*k*Math.exp(-k/3.5),0.35,1.9);
-      var cond=Math.min(1,s.cond*fac),p=Math.min(1,s.p*clamp(0.5+0.5*fac,0.6,1.05));
-      leads.push({min:j*10,t:nowSec+j*FC_STEP,p:p,cond:cond,score:p*cond});
+      var t=nowSec+j*FC_STEP,a=fcAt(S,c.x,c.y,t);
+      leads.push({min:j*10,t:t,p:a.p,cond:a.cond,score:a.score});
     }
     var obs=series.map(function(sr){var s=fcDisc(sr.f,c.x,c.y,2);return {t:sr.t,p:s.p,cond:s.cond,score:s.p*s.cond};});
-    var peak=0;for(i=0;i<last.f.length;i++)if(last.f[i]>peak)peak=last.f[i];
-    return {leads:leads,obs:obs,vel:vel,cps:cps,q:q,skill:skill,trend:g,dry:peak<WET,lag:nowSec-t0,frames:n};
+    return {leads:leads,obs:obs,vel:S.vel,cps:S.cps,q:S.q,skill:S.skill,trend:S.g,dry:S.dry,lag:S.lag,frames:S.n};
+  }
+  // exposicion a la lluvia a lo largo de una ruta: pts=[{x,y}] celdas, distKm, speed km/h, depMin salida desde ahora
+  var FC_MAXMIN=60; // mas alla de 1 h no hay pronostico util
+  function rtExposure(S,pts,distKm,speed,depMin,nowSec){
+    var n=pts.length,totMin=distKm/speed*60,dtm=totMin/n,W=0,I=0,maxP=0,maxC=0,cov=0,segs=[];
+    for(var i=0;i<n;i++){
+      var tm=depMin+(i+0.5)*dtm;
+      if(tm>FC_MAXMIN){segs.push({cut:true,p:0,cond:0,score:0});continue;}
+      var a=fcAt(S,pts[i].x,pts[i].y,nowSec+tm*60);segs.push(a);
+      W+=a.p*dtm;I+=a.score*dtm;cov+=dtm;
+      if(a.p>maxP)maxP=a.p;if(a.p>=0.5&&a.cond>maxC)maxC=a.cond;
+    }
+    return {segs:segs,wetMin:W,intMin:I,maxP:maxP,maxCond:maxC,totMin:totMin,covMin:cov};
   }
   // </fc-model>
 
@@ -566,6 +648,10 @@
     var gx=(lon+180)/360*n, gy=(0.5-Math.log((1+s)/(1-s))/(4*Math.PI))*n;
     var x0=Math.floor(gx)-FWIN/2, y0=Math.floor(gy)-FWIN/2;
     return {x0:x0,y0:y0,cx:(gx-x0)/FSTEP-0.5,cy:(gy-y0)/FSTEP-0.5,km:40075.017*Math.cos(lat*Math.PI/180)/n*FSTEP};
+  }
+  function fcCell(w,lat,lon){
+    var n=256*Math.pow(2,FZ),sn=Math.sin(lat*Math.PI/180);
+    return {x:((lon+180)/360*n-w.x0)/FSTEP-0.5,y:((0.5-Math.log((1+sn)/(1-sn))/(4*Math.PI))*n-w.y0)/FSTEP-0.5};
   }
   function fcTile(frame,tx,ty){
     return new Promise(function(res){
@@ -663,11 +749,144 @@
       if(mySeq!==fcSeq)return;
       arr=arr.filter(function(s){return s.f;});
       if(arr.length<2){fcMsg('No se pudo leer el radar para este punto');return;}
-      var keep={};use.forEach(function(fr){keep[fr.time+'|'+key]=1;});
-      for(var ck in fcCache)if(!keep[ck])delete fcCache[ck];
+      var keep={};use.forEach(function(fr){keep[fr.time]=1;});
+      for(var ck in fcCache)if(!keep[ck.split('|')[0]])delete fcCache[ck];
       renderForecast(fcModel(arr,{x:w.cx,y:w.cy},Date.now()/1000),w.km);
     }).catch(function(e){if(mySeq===fcSeq)fcMsg('Pronóstico no disponible');console.error('[lluvia] pronostico',e);});
   }
+
+  // ============ RUTA: ¿como me afectara la lluvia de A a B? ============
+  // Linea recta A->B (no es navegacion): se muestrea la ruta, y cada tramo se evalua con el
+  // pronostico en el instante en que lo recorrerias. Compara salir ahora / +10 / +20 / +30 min.
+  var RT_DEPS=[0,10,20,30], RT_MODES={walk:5,bike:15,car:30};
+  var rt={a:null,b:null,mode:'walk',dep:0,pick:null,res:null,layer:null,seq:0};
+  var userLL=null;
+  function hav(a,b){var R=6371,r=Math.PI/180,dl=(b.lat-a.lat)*r,dn=(b.lon-a.lon)*r;
+    var h=Math.sin(dl/2)*Math.sin(dl/2)+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dn/2)*Math.sin(dn/2);
+    return 2*R*Math.asin(Math.sqrt(h));}
+  function fmtMin(m){m=Math.round(m);return m<60?m+' min':Math.floor(m/60)+' h '+(m%60?(m%60)+' min':'');}
+  function segColor(a){return a.cut?'#6b7f92':(a.p<0.25?'#cfe6f5':catOf(a.cond).c);}
+  function rtClearLayer(){if(rt.layer){map.removeLayer(rt.layer);rt.layer=null;}}
+  function rtSetPick(m){
+    rt.pick=(rt.pick===m)?null:m;
+    $('rtO').classList.toggle('pick',rt.pick==='a');$('rtD').classList.toggle('pick',rt.pick==='b');
+    var h=$('pickHint');
+    if(rt.pick){h.textContent='Toca el mapa para elegir '+(rt.pick==='a'?'el origen (A)':'el destino (B)');h.classList.add('on');closeSheet();}
+    else h.classList.remove('on');
+  }
+  function rtSetPoint(which,lat,lon,label){
+    rt[which]={lat:lat,lon:lon,label:label};
+    $(which==='a'?'rtOt':'rtDt').textContent=label;
+    rt.pick=null;$('rtO').classList.remove('pick');$('rtD').classList.remove('pick');$('pickHint').classList.remove('on');
+    runRoute();
+  }
+  function rtReset(){
+    rt.a=rt.b=null;rt.res=null;rt.pick=null;rt.seq++;rtClearLayer();
+    $('rtOt').textContent='Elegir origen';$('rtDt').textContent='Elegir destino';
+    ['rtO','rtD'].forEach(function(i){$(i).classList.remove('pick');});$('pickHint').classList.remove('on');
+    $('rtHead').textContent='';$('rtDeps').textContent='';$('rtStrip').textContent='';$('rtTicks').style.display='none';
+    $('rtNote').textContent='Elige origen (A) y destino (B). Es una línea recta, no una ruta de navegación: sirve para ver cuánta lluvia te tocaría en el trayecto.';
+    $('rtChip').classList.remove('on');
+  }
+  function rtDraw(){
+    rtClearLayer();
+    if(!rt.res||!rt.a||!rt.b)return;
+    var r=rt.res.opts[rt.dep],g=L.layerGroup(),n=r.segs.length,A=rt.a,B=rt.b;
+    function ll(t){return [A.lat+(B.lat-A.lat)*t,A.lon+(B.lon-A.lon)*t];}
+    L.polyline([ll(0),ll(1)],{color:'#0a1420',weight:9,opacity:.55,interactive:false,lineCap:'round'}).addTo(g);
+    r.segs.forEach(function(sg,i){
+      L.polyline([ll(i/n),ll((i+1)/n)],{color:segColor(sg),weight:5,opacity:1,interactive:false,lineCap:'butt'}).addTo(g);
+    });
+    L.circleMarker([A.lat,A.lon],{radius:8,color:'#fff',weight:2.5,fillColor:'#4cc9f0',fillOpacity:1,interactive:false}).addTo(g);
+    L.circleMarker([B.lat,B.lon],{radius:8,color:'#fff',weight:2.5,fillColor:'#f72585',fillOpacity:1,interactive:false}).addTo(g);
+    g.addTo(map);rt.layer=g;
+  }
+  function rtHeadline(r){
+    var cat=catOf(r.maxCond||r.segs.reduce(function(m,s){return Math.max(m,s.cond);},0));
+    if(r.maxP<0.25&&r.wetMin<1)return 'Sin lluvia esperada en tu trayecto';
+    if(r.maxP<0.5)return 'Posible lluvia '+cat.n.toLowerCase()+' (prob. '+Math.round(r.maxP*100)+'%) · ~'+fmtMin(r.wetMin)+' bajo lluvia';
+    return 'Lluvia '+cat.n.toLowerCase()+' · ~'+fmtMin(r.wetMin)+' bajo lluvia de '+fmtMin(r.covMin);
+  }
+  function rtRender(){
+    var R=rt.res;if(!R)return;
+    var sel=R.opts[rt.dep];
+    $('rtHead').textContent=rtHeadline(sel);
+    // opciones de salida
+    var deps=$('rtDeps');deps.textContent='';
+    var bestI=0;R.opts.forEach(function(o,i){if(o.intMin<R.opts[bestI].intMin-1e-9)bestI=i;});
+    var fullCov=R.opts.every(function(o){return o.covMin>=o.totMin-0.5;});
+    var improves=fullCov&&R.opts[0].intMin>0.5&&R.opts[0].wetMin-R.opts[bestI].wetMin>=3&&R.opts[bestI].intMin<R.opts[0].intMin*0.8;
+    R.opts.forEach(function(o,i){
+      var card=el('button','rt-dep'+(i===rt.dep?' sel':''));
+      card.appendChild(el('div','k',i===0?'Ahora':'+'+RT_DEPS[i]+' min'));
+      var w=el('div','v',o.wetMin<0.5?'Seco':'~'+fmtMin(o.wetMin));
+      w.style.color=o.wetMin<0.5?'var(--accent2)':catOf(o.maxCond||0.2).c;card.appendChild(w);
+      card.appendChild(el('div','t',fmtTime(R.now+RT_DEPS[i]*60)));
+      if(improves&&i===bestI)card.appendChild(el('div','best','Mejor'));
+      card.onclick=function(){rt.dep=i;rtRender();rtDraw();};
+      deps.appendChild(card);
+    });
+    // franja de exposicion a lo largo del trayecto
+    var st=$('rtStrip');st.textContent='';
+    sel.segs.forEach(function(sg){var b=el('div','seg');b.style.background=segColor(sg);if(sg.cut)b.classList.add('cut');st.appendChild(b);});
+    $('rtTicks').style.display='';$('rtT0').textContent='A · '+fmtTime(R.now+RT_DEPS[rt.dep]*60);
+    $('rtT1').textContent=R.km.toFixed(1)+' km · '+fmtMin(sel.totMin);
+    $('rtT2').textContent='B · '+fmtTime(R.now+(RT_DEPS[rt.dep]+sel.totMin)*60);
+    var note=(improves?'Salir en '+(bestI===0?'este momento':'+'+RT_DEPS[bestI]+' min')+' reduce la lluvia a ~'+fmtMin(R.opts[bestI].wetMin)+' (vs ~'+fmtMin(R.opts[0].wetMin)+' si sales ahora). ':
+      (R.opts[0].intMin>0.5?'Esperar no cambia mucho el resultado. ':''));
+    if(sel.covMin<sel.totMin-0.5)note+='Pronóstico solo hasta 60 min: el tramo final (gris) no tiene estimación, por eso no se comparan horas de salida. ';
+    note+='Confianza: '+R.conf+'. Cada tramo se evalúa a la hora en que lo recorrerías.';
+    $('rtNote').textContent=note;
+    // chip flotante sobre el mapa
+    var chip=$('rtChip');chip.textContent=fmtMin(sel.totMin)+' · '+(sel.wetMin<0.5?'sin lluvia':'~'+fmtMin(sel.wetMin)+' con lluvia');
+    chip.style.borderColor=sel.wetMin<0.5?'rgba(94,224,208,.5)':catOf(sel.maxCond||0.2).c;chip.classList.add('on');
+  }
+  function runRoute(){
+    var mySeq=++rt.seq;
+    if(!rt.a||!rt.b){return Promise.resolve();}
+    var km=hav(rt.a,rt.b);
+    if(km<0.15){$('rtHead').textContent='Origen y destino están muy cerca';return Promise.resolve();}
+    if(!frames.length||pastCount<2){$('rtHead').textContent='Esperando datos del radar…';return Promise.resolve();}
+    var mid={lat:(rt.a.lat+rt.b.lat)/2,lon:(rt.a.lon+rt.b.lon)/2};
+    mid.lat=Math.round(mid.lat*50)/50;mid.lon=Math.round(mid.lon*50)/50;
+    var w=fcWindow(mid.lat,mid.lon),key='r'+mid.lat.toFixed(2)+','+mid.lon.toFixed(2);
+    var ca=fcCell(w,rt.a.lat,rt.a.lon),cb=fcCell(w,rt.b.lat,rt.b.lon);
+    if(Math.max(Math.abs(ca.x-NG/2),Math.abs(ca.y-NG/2),Math.abs(cb.x-NG/2),Math.abs(cb.y-NG/2))>NG/2-3){
+      $('rtHead').textContent='La ruta es demasiado larga (máx. ~60 km)';$('rtDeps').textContent='';$('rtStrip').textContent='';return Promise.resolve();}
+    $('rtHead').textContent='Calculando…';
+    var use=frames.slice(0,pastCount).slice(-FC_FRAMES);
+    return Promise.all(use.map(function(fr){return fcField(fr,w,key).then(function(f){return {t:fr.time,f:f};});}))
+    .then(function(arr){
+      if(mySeq!==rt.seq)return;
+      arr=arr.filter(function(s){return s.f;});
+      if(arr.length<2){$('rtHead').textContent='No se pudo leer el radar para esta ruta';return;}
+      var now=Date.now()/1000,S=fcPrepare(arr,{x:w.cx,y:w.cy},now);
+      var n=Math.max(8,Math.min(60,Math.ceil(km/0.5))),pts=[];
+      for(var i=0;i<n;i++){var t=(i+0.5)/n;pts.push({x:ca.x+(cb.x-ca.x)*t,y:ca.y+(cb.y-ca.y)*t});}
+      var speed=RT_MODES[rt.mode];
+      var opts=RT_DEPS.map(function(d){return rtExposure(S,pts,km,speed,d,now);});
+      var conf=S.q<0.3?'Baja':(S.skill==null?'Media':(S.skill>=0.45?'Alta':(S.skill>=0.2?'Media':'Baja')));
+      rt.res={opts:opts,now:now,km:km,conf:conf};
+      rtRender();rtDraw();
+    }).catch(function(e){if(mySeq===rt.seq)$('rtHead').textContent='Ruta no disponible';console.error('[lluvia] ruta',e);});
+  }
+  $('rtO').onclick=function(){rtSetPick('a');};
+  $('rtD').onclick=function(){rtSetPick('b');};
+  $('rtMe').onclick=function(){
+    if(userLL){rtSetPoint('a',userLL.lat,userLL.lon,'Mi ubicación');return;}
+    if(!navigator.geolocation){showBanner('Tu navegador no permite ubicación.');return;}
+    navigator.geolocation.getCurrentPosition(function(p){
+      userLL={lat:p.coords.latitude,lon:p.coords.longitude};rtSetPoint('a',userLL.lat,userLL.lon,'Mi ubicación');hideBanner();
+    },function(err){showBanner(err.code===1?'Permiso de ubicación denegado. Actívalo en Ajustes → Safari.':'No se pudo obtener tu ubicación.');},
+    {enableHighAccuracy:true,timeout:10000,maximumAge:60000});
+  };
+  $('rtClr').onclick=rtReset;
+  $('rtChip').onclick=function(){openSheet();};
+  Array.prototype.forEach.call(document.querySelectorAll('#rtModes button'),function(b){
+    b.onclick=function(){rt.mode=b.getAttribute('data-m');
+      Array.prototype.forEach.call(document.querySelectorAll('#rtModes button'),function(x){x.classList.toggle('sel',x===b);});
+      if(rt.a&&rt.b)runRoute();};
+  });
 
   // ============ SISTEMA DE PARTICULAS (flujo animado) ============
   var particles=[], rafId=null, dpr=Math.min(window.devicePixelRatio||1,2);
@@ -747,7 +966,7 @@
     return loadRadar().then(function(){
       setSub('En vivo · actualizado '+new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}));
       $('stamp').textContent=new Date().toLocaleTimeString('es-MX');hideBanner();
-      return computeAdvection().then(renderVector).then(runForecast);
+      return computeAdvection().then(renderVector).then(runForecast).then(runRoute);
     }).catch(function(e){setSub('Radar no disponible · reintentando',true);showBanner('No se pudo cargar el radar. Se reintentará en un momento.');console.error('[lluvia]',e);});
   }
 
@@ -760,7 +979,10 @@
   var timer=setInterval(update,REFRESH_MS);
   $('tAuto').onchange=function(e){clearInterval(timer);if(e.target.checked)timer=setInterval(update,REFRESH_MS);};
   map.on('movestart',function(){stop();});
-  map.on('click',function(e){setFcPoint(e.latlng.lat,e.latlng.lng,'Punto elegido en el mapa','tap');});
+  map.on('click',function(e){
+    if(rt.pick){var wh=rt.pick;rtSetPoint(wh,e.latlng.lat,e.latlng.lng,wh==='a'?'Punto A en el mapa':'Punto B en el mapa');return;}
+    setFcPoint(e.latlng.lat,e.latlng.lng,'Punto elegido en el mapa','tap');
+  });
   // al mover/hacer zoom, limpiar estelas viejas (las particulas re-fluyen desde el nuevo encuadre)
   map.on('move zoom viewreset',function(){clearVec();});
   map.on('moveend zoomend',function(){resizeVec();});
@@ -778,7 +1000,7 @@
       userMk=L.marker([lat,lon],{icon:L.divIcon({className:'',html:'<div class="user-dot"></div>',iconSize:[18,18],iconAnchor:[9,9]})}).addTo(map);
       map.flyTo([lat,lon],13,{duration:.8});
       btn.classList.remove('loading');btn.classList.add('active');setTimeout(function(){btn.classList.remove('active');},1500);
-      setFcPoint(lat,lon,'Tu ubicación','user');renderVector();hideBanner();
+      userLL={lat:lat,lon:lon};setFcPoint(lat,lon,'Tu ubicación','user');renderVector();hideBanner();
     },function(err){btn.classList.remove('loading');
       showBanner(err.code===1?'Permiso de ubicación denegado. Actívalo en Ajustes → Safari.':'No se pudo obtener tu ubicación.');
     },{enableHighAccuracy:true,timeout:10000,maximumAge:60000});
