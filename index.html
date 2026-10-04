@@ -201,6 +201,8 @@
   .rt-pin{flex:none;width:36px;height:36px;border-radius:10px;border:none;background:none;color:var(--dim);cursor:pointer;
     display:flex;align-items:center;justify-content:center}
   .rt-pin svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .rt-pin.loc{color:var(--accent)}
+  .rt-pin.loading svg{animation:spin 1s linear infinite}
   .rt-pin.pick{color:var(--accent);background:rgba(76,201,240,.16)}
   .rt-sug{display:none;margin:-2px 0 10px;background:rgba(255,255,255,.07);border-radius:12px;overflow:hidden}
   .rt-sug.on{display:block}
@@ -302,6 +304,7 @@
         </div>
         <div class="rt-field"><b>A</b>
           <input id="rtOin" type="text" placeholder="Origen: lugar o dirección" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search">
+          <button class="rt-pin loc" id="rtOloc" aria-label="Usar mi ubicación actual como origen" title="Mi ubicación actual"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3.2M12 18.3v3.2M2.5 12h3.2M18.3 12h3.2"/><circle cx="12" cy="12" r="7.5"/></svg></button>
           <button class="rt-pin" id="rtOpin" aria-label="Elegir origen en el mapa"><svg viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg></button></div>
         <div class="rt-sug" id="rtOsug"></div>
         <div class="rt-field"><b class="d">B</b>
@@ -906,11 +909,14 @@
     rt.fit=true;runRoute();
   }
   function useMyLocation(){
-    function done(){rtSetPoint('a',userLL.lat,userLL.lon,'Mi ubicación');hideBanner();}
+    var btn=$('rtOloc');
+    function done(){btn.classList.remove('loading');rtF.a.inp.placeholder='Origen: lugar o dirección';rtSetPoint('a',userLL.lat,userLL.lon,'Mi ubicación');hideBanner();}
+    function fail(err){btn.classList.remove('loading');rtF.a.inp.placeholder='Origen: lugar o dirección';
+      showBanner(err.code===1?'Permiso de ubicación denegado. Actívalo en Ajustes → Safari.':'No se pudo obtener tu ubicación.');}
     if(userLL){done();return;}
     if(!navigator.geolocation){showBanner('Tu navegador no permite ubicación.');return;}
-    navigator.geolocation.getCurrentPosition(function(p){userLL={lat:p.coords.latitude,lon:p.coords.longitude};done();},
-      function(err){showBanner(err.code===1?'Permiso de ubicación denegado. Actívalo en Ajustes → Safari.':'No se pudo obtener tu ubicación.');},
+    btn.classList.add('loading');rtF.a.inp.value='';rtF.a.inp.placeholder='Obteniendo tu ubicación…';hideSug('a');
+    navigator.geolocation.getCurrentPosition(function(p){userLL={lat:p.coords.latitude,lon:p.coords.longitude};done();},fail,
       {enableHighAccuracy:true,timeout:10000,maximumAge:60000});
   }
   function rtReset(){
@@ -1024,6 +1030,7 @@
       });
     }).catch(function(e){if(mySeq===rt.seq)$('rtHead').textContent='Ruta no disponible';console.error('[lluvia] ruta',e);});
   }
+  $('rtOloc').onclick=useMyLocation;
   $('rtOpin').onclick=function(){rtSetPick('a');};
   $('rtDpin').onclick=function(){rtSetPick('b');};
   $('rtSwap').onclick=function(){
