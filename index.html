@@ -842,12 +842,12 @@
   var ESRI='https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/';
   var ESRI_EXT=BOUNDS[0][1]+','+BOUNDS[0][0]+','+BOUNDS[1][1]+','+BOUNDS[1][0]; // xmin,ymin,xmax,ymax
   function esriSuggest(q,cat,signal){
-    var url=ESRI+'suggest?f=json&maxSuggestions=6&countryCode=MX&searchExtent='+ESRI_EXT+'&location=-99.1332,19.4326&text='+encodeURIComponent(q)+(cat?'&category='+cat:'');
+    var url=ESRI+'suggest?f=json&maxSuggestions=8&countryCode=MX&searchExtent='+ESRI_EXT+'&location=-99.1332,19.4326&text='+encodeURIComponent(q)+(cat?'&category='+cat:'');
     return fetch(url,{signal:signal}).then(function(r){if(!r.ok)throw new Error('esri '+r.status);return r.json();}).then(function(j){
       if(j.error)throw new Error('esri '+j.error.code);
       return (j.suggestions||[]).filter(function(x){return !x.isCollection;}).map(function(x){
-        var parts=x.text.split(', ').filter(function(t){return t!=='MEX'&&!/^\d{5}$/.test(t);});
-        return {main:parts[0],sub:parts.slice(1,4).join(', '),key:x.magicKey,text:x.text};
+        var l=esriLabel(x.text);
+        return {main:l.main,sub:l.sub,key:x.magicKey,text:x.text};
       });
     });
   }
@@ -872,12 +872,33 @@
         return {main:it.name||parts[0],sub:[a.road,a.suburb||a.neighbourhood,a.city||a.town||a.state].filter(Boolean).join(', '),lat:parseFloat(it.lat),lon:parseFloat(it.lon)};}));
     });
   }
-  // cadena: Esri -> Photon -> Nominatim. Si el texto trae numero (direccion) se priorizan resultados de tipo direccion.
-  function geoSearch(q,signal){
-    var hasNum=/\d/.test(q);
-    var esri=hasNum?Promise.all([esriSuggest(q,'Address',signal),esriSuggest(q,null,signal).catch(function(){return [];})]).then(function(r){
-        return uniq(r[0].concat(r[1])).slice(0,6);}):esriSuggest(q,null,signal);
-    return esri.then(function(l){if(!l.length)throw new Error('esri vacio');return l;}).catch(function(e){
+  // normaliza abreviaturas comunes antes de buscar
+  function normQ(q){
+    return q.replace(/#/g,' ').replace(/\b(?:no|num|núm)\.?\s*(?=\d)/gi,'').replace(/\bneza\b/gi,'Nezahualcóyotl')
+      .replace(/\bcdmx\b/gi,'Ciudad de México').replace(/\bedomex\b/gi,'Estado de México').replace(/\bcol\.?\s/gi,'colonia ')
+      .replace(/\bmpio\.?\s/gi,'').replace(/\s+/g,' ').trim();
+  }
+  function esriLabel(text){
+    var parts=text.split(', ').filter(function(t){return t!=='MEX'&&!/^\d{5}$/.test(t);});
+    return {main:parts[0],sub:parts.slice(1,4).join(', ')};
+  }
+  // findAddressCandidates directo: complementa a suggest con coincidencias de direccion completas (ya traen coordenadas)
+  function esriCandidates(q,signal){
+    var url=ESRI+'findAddressCandidates?f=json&maxLocations=6&outSR=4326&countryCode=MX&searchExtent='+ESRI_EXT+'&location=-99.1332,19.4326&SingleLine='+encodeURIComponent(q);
+    return fetch(url,{signal:signal}).then(function(r){if(!r.ok)throw new Error('esri c '+r.status);return r.json();}).then(function(j){
+      return (j.candidates||[]).filter(function(c){return c.score>=75&&c.location&&c.location.x>BOUNDS[0][1]&&c.location.x<BOUNDS[1][1]&&c.location.y>BOUNDS[0][0]&&c.location.y<BOUNDS[1][0];})
+        .map(function(c){var l=esriLabel(c.address);return {main:l.main,sub:l.sub,lat:c.location.y,lon:c.location.x};});
+    });
+  }
+  // cadena: Esri (direcciones + sugerencias) -> Photon -> Nominatim. Con numero se priorizan direcciones.
+  function geoSearch(q0,signal){
+    var q=normQ(q0),hasNum=/\d/.test(q),none=function(){return [];};
+    var jobs=hasNum?[esriCandidates(q,signal).catch(none),esriSuggest(q,'Address',signal).catch(none),esriSuggest(q,null,signal).catch(none)]
+                    :[esriSuggest(q,null,signal).catch(none),esriCandidates(q,signal).catch(none)];
+    return Promise.all(jobs).then(function(r){
+      var all=uniq(r.reduce(function(a,b){return a.concat(b);},[])).slice(0,8);
+      if(!all.length)throw new Error('esri vacio');return all;
+    }).catch(function(e){
       if(e&&e.name==='AbortError')throw e;
       return photonSearch(q,signal).then(function(l){if(!l.length)throw new Error('photon vacio');return l;});
     }).catch(function(e){
@@ -895,15 +916,17 @@
   function addSug(w,main,sub,cls,onpick){
     var b=el('button','rt-s'+(cls?' '+cls:''));b.type='button';
     b.appendChild(el('div','m',main));if(sub)b.appendChild(el('div','s',sub));
-    // pointerdown evita que el blur del input cierre la lista antes del toque
-    b.addEventListener('pointerdown',function(e){e.preventDefault();onpick();});
+    // mousedown (sin default) evita que el input pierda el foco; la seleccion ocurre en click,
+    // asi arrastrar para hacer scroll sobre la lista no selecciona nada
+    b.addEventListener('mousedown',function(e){e.preventDefault();});
+    b.addEventListener('click',function(e){e.preventDefault();onpick();});
     rtF[w].sug.appendChild(b);
   }
   function showSug(w,list,msg){
     var sg=rtF[w].sug;sg.textContent='';
     if(w==='a')addSug('a','Mi ubicación','Usar tu posición actual','me',useMyLocation);
     list.forEach(function(s){addSug(w,s.main,s.sub,'',function(){
-      var label=s.key?(s.main+(s.sub?', '+s.sub.split(', ')[0]:'')):s.main;
+      var label=s.main+(s.sub?', '+s.sub.split(', ')[0]:'');
       if(!s.key){rtSetPoint(w,s.lat,s.lon,label);return;}
       rtF[w].inp.value=label;hideSug(w);rtF[w].inp.blur();
       esriResolve(s).then(function(pt){rtSetPoint(w,pt.lat,pt.lon,label);})
@@ -929,9 +952,9 @@
     var f=rtF[w];
     f.inp.addEventListener('input',function(){onType(w);});
     f.inp.addEventListener('focus',function(){if(!open)openSheet();if(w==='a'&&!f.inp.value)showSug('a',[],null);});
-    f.inp.addEventListener('blur',function(){setTimeout(function(){hideSug(w);},120);});
+    f.inp.addEventListener('blur',function(){setTimeout(function(){hideSug(w);},250);});
     f.inp.addEventListener('keydown',function(e){
-      if(e.key==='Enter'){e.preventDefault();var first=f.sug.querySelector('.rt-s:not(.me):not(.empty)');if(first)first.dispatchEvent(new Event('pointerdown'));f.inp.blur();}
+      if(e.key==='Enter'){e.preventDefault();var first=f.sug.querySelector('.rt-s:not(.me):not(.empty)');if(first)first.click();f.inp.blur();}
     });
   });
 
