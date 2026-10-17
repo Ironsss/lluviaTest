@@ -402,7 +402,7 @@
   // el radar se vuelve mas transparente al acercar, para no tapar las calles
   function radarOpacityFor(z){return z<=11?0.68:Math.max(0.5,0.68-(z-11)*0.05);}
 
-  var map=L.map('map',{zoomControl:false,attributionControl:false,minZoom:8,maxZoom:17,zoomSnap:.5}).setView(CENTER,10);
+  var map=L.map('map',{zoomControl:false,attributionControl:false,minZoom:8,maxZoom:17,zoomSnap:.5,maxBoundsViscosity:1}).setView(CENTER,10);
   // tiles en HD: en pantallas retina se piden tiles del nivel siguiente (mas pixeles por pixel CSS)
   var RET=!!(L.Browser&&L.Browser.retina);
   function hd(native,max){return {detectRetina:true,maxNativeZoom:RET?native-1:native,maxZoom:RET?max+1:max};}
@@ -479,6 +479,10 @@
   })();
   map.on('zoomend',function(){if(curLayer&&$('tRadar').checked)curLayer.setOpacity(frameOpacity(frames[pos]));});
   map.setMaxBounds(BOUNDS);
+  // La vista nunca debe ser mas grande que BOUNDS: si lo fuera, Leaflet recentra el mapa a la fuerza al arrastrar
+  // (el "tiron"). Se sube el zoom minimo hasta que BOUNDS cubra la vista, y se recalcula al cambiar el tamano.
+  function fitMinZoom(){if(map.getSize().x>0)map.setMinZoom(Math.max(8,map.getBoundsZoom(BOUNDS,true)));}
+  map.on('resize',fitMinZoom);fitMinZoom();
 
   var host='',frames=[],pastCount=0,pos=0,curLayer=null,layerCache={},playing=false,playTimer=null,loading=false;
   var vecCanvas=$('vec'), vctx=vecCanvas.getContext('2d');
