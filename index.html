@@ -182,6 +182,13 @@
   .fc-chart .bar{width:100%;border-radius:3px 3px 0 0}
   .fc-chart .col.fc .bar{opacity:.55;background-image:repeating-linear-gradient(135deg,rgba(0,0,0,.28) 0 3px,transparent 3px 6px)}
   .fc-chart .col.first{margin-left:6px}
+  .sec-sub{font-size:12px;font-weight:600;color:var(--dim);margin:6px 0 8px}
+  .md-grid{grid-template-columns:repeat(4,1fr);margin-bottom:10px}
+  .md-grid .fc-card{padding:8px 4px}.md-grid .fc-card .v{font-size:17px}
+  .md-msg{font-size:13px;line-height:1.45;border-radius:12px;padding:10px 12px;margin-bottom:12px;display:none}
+  .md-msg.on{display:block}
+  .md-msg.warn{background:rgba(232,214,58,.12);border:1px solid rgba(232,214,58,.35);color:#f3e9a0}
+  .md-msg.ok{background:rgba(94,224,208,.1);border:1px solid rgba(94,224,208,.3);color:var(--accent2)}
   .fc-ticks{display:flex;justify-content:space-between;font-size:10px;color:var(--faint);margin:5px 0 8px;font-variant-numeric:tabular-nums}
 
   /* ruta */
@@ -309,6 +316,9 @@
         <div class="fc-grid" id="fcGrid"></div>
         <div class="fc-chart" id="fcChart"></div>
         <div class="fc-ticks"><span id="fcT0">−80 min</span><span>ahora</span><span>+60 min</span></div>
+        <div class="sec-sub">Modelo meteorológico · próximas 3 h</div>
+        <div class="fc-grid md-grid" id="mdGrid"></div>
+        <div class="md-msg" id="mdMsg"></div>
         <div class="legend-note" id="fcNote">Toca el mapa o usa tu ubicación para elegir el punto. Modelo ligero con el movimiento observado en el radar; no sustituye alertas oficiales.</div>
       </div>
 
@@ -809,6 +819,53 @@
     });
   }
 
+  // ============ MODELO METEOROLOGICO (Open-Meteo, por hora, 3 h) ============
+  // Segunda fuente independiente del radar: el radar no ve llovizna debil ni zonas sin cobertura. Resolucion horaria (~10 km).
+  var mdCache={};
+  function mmCat(mm){return mm<0.1?CATS[0]:mm<2.5?CATS[1]:mm<7.5?CATS[2]:mm<15?CATS[3]:mm<30?CATS[4]:CATS[5];}
+  function loadModel(lat,lon){
+    var key=lat.toFixed(2)+','+lon.toFixed(2),c=mdCache[key];
+    if(c&&Date.now()-c.t<600000)return Promise.resolve(c.v);
+    var url='https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lon+'&hourly=precipitation,precipitation_probability&forecast_days=2&timezone=auto&timeformat=unixtime';
+    return fetch(url).then(function(r){if(!r.ok)throw new Error('modelo '+r.status);return r.json();}).then(function(j){
+      var h=j.hourly,now=Date.now()/1000,i0=0,rows=[],i;
+      for(i=0;i<h.time.length;i++)if(h.time[i]<=now)i0=i;
+      for(i=0;i<4&&i0+i<h.time.length;i++)
+        rows.push({t:h.time[i0+i],mm:h.precipitation[i0+i]||0,p:h.precipitation_probability?h.precipitation_probability[i0+i]:null});
+      mdCache[key]={t:Date.now(),v:rows};return rows;
+    });
+  }
+  function renderModel(rows,res){
+    var grid=$('mdGrid'),msg=$('mdMsg');grid.textContent='';
+    rows.forEach(function(r,k){
+      var cat=mmCat(r.mm),card=el('div','fc-card');card.style.borderColor=r.mm>=0.1?cat.c:'';
+      card.appendChild(el('div','k',k===0?'Esta hora':'+'+k+' h'));
+      card.appendChild(el('div','v',r.mm<0.05?'0':r.mm.toFixed(1)));
+      card.appendChild(el('div','t','mm/h'+(r.p!=null?' · '+r.p+'%':'')));
+      var c=el('div','c',cat.n);c.style.color=cat.c;card.appendChild(c);
+      grid.appendChild(card);
+    });
+    // radar (proxima hora) vs modelo (esta hora y la siguiente)
+    var rp=res.obs[res.obs.length-1].p;res.leads.forEach(function(l){if(l.p>rp)rp=l.p;});
+    var radarWet=rp>=0.4,radarDry=rp<0.15;
+    var m0=rows.slice(0,2),modelWet=m0.some(function(r){return r.mm>=0.2||(r.p!=null&&r.p>=60);}),
+        modelDry=m0.every(function(r){return r.mm<0.1&&(r.p==null||r.p<30);});
+    var top=m0.reduce(function(a,r){return r.mm>a.mm?r:a;},m0[0]);
+    msg.className='md-msg';
+    if(radarDry&&modelWet){msg.className='md-msg on warn';
+      msg.textContent='El radar no detecta lluvia en tu punto, pero el modelo marca lluvia '+mmCat(top.mm).n.toLowerCase()+' ('+top.mm.toFixed(1)+' mm/h'+(top.p!=null?', '+top.p+'%':'')+'). El radar puede no ver llovizna débil o zonas sin cobertura: tómalo como posible.';}
+    else if(radarWet&&modelDry){msg.className='md-msg on warn';
+      msg.textContent='El radar detecta lluvia, pero el modelo no la prevé en esta hora. Para la próxima hora manda el radar (es observación real).';}
+    else if(radarDry&&modelDry){msg.className='md-msg on ok';msg.textContent='Radar y modelo coinciden: sin lluvia en tu punto.';}
+    else if(radarWet&&modelWet){msg.className='md-msg on ok';msg.textContent='Radar y modelo coinciden: hay lluvia en tu punto.';}
+  }
+  function runModel(res){
+    var seq=++fcSeq2;
+    return loadModel(fcPoint.lat,fcPoint.lon).then(function(rows){if(seq===fcSeq2&&rows.length)renderModel(rows,res);})
+      .catch(function(e){if(seq!==fcSeq2)return;$('mdGrid').textContent='';$('mdMsg').className='md-msg on warn';$('mdMsg').textContent='El modelo meteorológico no está disponible ahora.';console.warn('[lluvia] modelo',e);});
+  }
+  var fcSeq2=0;
+
   function fcMsg(t){$('fcHead').textContent=t;$('fcGrid').textContent='';$('fcChart').textContent='';$('tlFc').textContent='';$('tlFc').classList.remove('show');}
   function renderForecast(res,km){
     $('fcWhere').textContent=fcPoint.label;
@@ -865,6 +922,7 @@
       (mv>=3?'Sistema hacia '+dir+' a ~'+Math.round(mv)+' km/h. ':'Sistema casi estacionario. '))+
       'Confianza: '+conf+' · '+res.frames+' frames de radar'+(res.lag>1200?' · datos con '+Math.round(res.lag/60)+' min de retraso':'')+'.';
     $('fcNote').textContent=txt;
+    runModel(res);
   }
   function setFcPoint(lat,lon,label,kind){
     fcPoint={lat:Math.round(lat*50)/50,lon:Math.round(lon*50)/50,label:label,kind:kind};
