@@ -248,6 +248,9 @@
     .sheet{left:auto;right:0;width:380px;height:100vh;transform:none;border-radius:0;border-left:.5px solid var(--hair);border-top:none}
     .sheet-handle{display:none}
     .sheet-scroll{height:100vh;padding-top:calc(var(--safe-top) + 20px)}
+    /* el mapa termina donde empieza el panel: asi el centro, los limites y el zoom minimo se calculan sobre el area visible */
+    #map{right:380px}
+    canvas#vec{width:calc(100% - 380px)}
     .timeline{right:calc(380px + 14px)}
     .fabs{right:calc(380px + 14px)}
   }
