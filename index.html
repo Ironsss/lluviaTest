@@ -248,6 +248,8 @@
     .sheet{left:auto;right:0;width:380px;height:100vh;transform:none;border-radius:0;border-left:.5px solid var(--hair);border-top:none}
     .sheet-handle{display:none}
     .sheet-scroll{height:100vh;padding-top:calc(var(--safe-top) + 20px)}
+    /* el panel de escritorio nunca recibe .open: sin esto heredaba overflow:hidden de .sheet:not(.open) y la rueda no lo movia */
+    .sheet:not(.open) .sheet-scroll{overflow-y:auto;touch-action:pan-y;scrollbar-width:thin}
     .timeline{right:calc(380px + 14px)}
     .fabs{right:calc(380px + 14px)}
   }
