@@ -250,6 +250,9 @@
     .sheet-scroll{height:100vh;padding-top:calc(var(--safe-top) + 20px)}
     /* el panel de escritorio nunca recibe .open: sin esto heredaba overflow:hidden de .sheet:not(.open) y la rueda no lo movia */
     .sheet:not(.open) .sheet-scroll{overflow-y:auto;touch-action:pan-y;scrollbar-width:thin}
+    /* el mapa termina donde empieza el panel: asi el centro, los limites y el zoom minimo se calculan sobre el area visible */
+    #map{right:380px}
+    canvas#vec{width:calc(100% - 380px)}
     .timeline{right:calc(380px + 14px)}
     .fabs{right:calc(380px + 14px)}
   }
