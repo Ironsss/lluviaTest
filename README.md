@@ -4,6 +4,16 @@ Dashboard interactivo de **precipitación en tiempo real** para la Ciudad de Mé
 
 **Demo:** https://ironsss.github.io/lluviaTest/
 
+## Capturas
+
+<p>
+  <img src="capturas/radar.png" width="220" alt="Radar de lluvia con línea de tiempo">
+  <img src="capturas/pronostico.png" width="220" alt="Pronóstico de +10 a +60 minutos">
+  <img src="capturas/ruta.png" width="220" alt="Ruta con tiempo de lluvia">
+</p>
+
+*Capturas de la versión Android (en desarrollo), que usa esta misma interfaz. Radar, pronóstico de +10 a +60 min y ruta A → B con el tiempo de lluvia por tramo. Las capturas se tomaron con el radar sin lluvia (0%).*
+
 ![Estado](https://img.shields.io/badge/estado-en%20vivo-4cc9f0) ![Sin API key](https://img.shields.io/badge/API%20key-no%20requerida-3ad6a0) ![Licencia](https://img.shields.io/badge/licencia-MIT-blue)
 
 ---
