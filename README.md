@@ -25,6 +25,7 @@ Dashboard interactivo de **precipitación en tiempo real** para la Ciudad de Mé
 - **Campo vectorial de dirección** — estima hacia dónde se desplaza la lluvia mediante flujo óptico entre los dos frames de radar más recientes.
 - **Pronóstico en la línea de tiempo (+10 a +60 min)** — al final de la barra de tiempo, después de la marca *ahora*, aparecen cuadros de pronóstico (zona verde) que muestran la lluvia desplazada según el movimiento estimado del radar, con más suavizado y transparencia cuanto más lejano el horizonte. Los botones *+10 … +60* saltan a cada cuadro e indican la probabilidad de lluvia en tu punto.
 - **Ruta y lluvia (A → B)** — escribe origen y destino (lugares o direcciones, con sugerencias) o elígelos en el mapa; la ruta sigue las calles reales (a pie, bici o auto) y muestra cuánto tiempo te tocaría de lluvia en el trayecto. Cada tramo se evalúa con el pronóstico a la hora en que lo recorrerías, y se compara salir ahora, +10, +20 o +30 min. El pronóstico llega a 60 min.
+- **Lluvia del modelo (violeta)** — donde el radar no tiene cobertura o no ve llovizna débil (p. ej. Puebla), una capa violeta muestra la lluvia estimada por un modelo meteorológico (rejilla ~35 km, por hora), siguiendo la línea de tiempo. Va debajo del radar: donde hay radar, manda el radar. Se puede apagar en *Capas*.
 - **Mi ubicación** — botón de geolocalización con marcador "estás aquí" y círculo de precisión, para saber si te va a llover encima ahora mismo.
 - **Interfaz móvil-first** — mapa a pantalla completa con *bottom sheet* deslizable, glassmorphism sutil y switches estilo iOS. Respeta el notch y la barra inferior del iPhone.
 - **Modo pantalla completa** y capas conmutables (radar, flecha, nowcast, auto-actualización).
@@ -60,7 +61,7 @@ Todas gratuitas y sin API key para uso personal/educativo.
 | **RainViewer** | `api.rainviewer.com/public/weather-maps.json` | Radar de lluvia (capa principal + timeline) | 1 petición / 5 min |
 | **Esri Dark Gray** | `server.arcgisonline.com` | Tiles del mapa base y etiquetas | Bajo demanda (pan/zoom) |
 | **OpenFreeMap** (OpenStreetMap, vectorial) | `tiles.openfreemap.org` | Calles y nombres nítidos sobre el radar (respaldo: tiles raster de OSM) | Bajo demanda (pan/zoom) |
-| **Open-Meteo** | `api.open-meteo.com` | Modelo meteorológico por hora (próximas 3 h) para contrastar con el radar | 1 petición por punto cada 10 min |
+| **Open-Meteo** | `api.open-meteo.com` | Modelo meteorológico por hora: próximas 3 h en tu punto y capa de lluvia estimada (rejilla 14×12, ~35 km) | Punto: cada 10 min; rejilla: cada 30 min (4 peticiones) |
 | **Esri World Geocoder** | `geocode.arcgis.com` (respaldos: `photon.komoot.io`, `nominatim.openstreetmap.org`) | Búsqueda de lugares y direcciones con sugerencias | Al escribir (con pausa de 280 ms) |
 | **OSRM** (FOSSGIS) | `routing.openstreetmap.de` | Ruta real por calles a pie / bici / auto | 1 petición por ruta |
 | **Geolocation API** | `navigator.geolocation` | Ubicación del usuario (local del dispositivo) | Al tocar el botón |
