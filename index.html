@@ -355,6 +355,8 @@
         <div class="rows">
           <label class="row"><span class="rl">Radar de lluvia</span>
             <span class="sw-tog"><input type="checkbox" id="tRadar" checked><span class="track"></span></span></label>
+          <label class="row"><span class="rl">Lluvia del modelo<small>Estimación por hora (~35 km) donde el radar no llega</small></span>
+            <span class="sw-tog"><input type="checkbox" id="tModel" checked><span class="track"></span></span></label>
           <label class="row"><span class="rl">Flecha de dirección<small>Hacia dónde se mueve el sistema</small></span>
             <span class="sw-tog"><input type="checkbox" id="tVec" checked><span class="track"></span></span></label>
           <label class="row"><span class="rl">Incluir pronóstico en el mapa<small>Extrapolación del radar hasta +60 min</small></span>
@@ -372,8 +374,9 @@
           <div class="legend-row"><span class="sw" style="background:#e8d63a"></span>Fuerte</div>
           <div class="legend-row"><span class="sw" style="background:#e8853a"></span>Muy fuerte</div>
           <div class="legend-row"><span class="sw" style="background:#f72585"></span>Torrencial / granizo</div>
+          <div class="legend-row"><span class="sw" style="background:linear-gradient(90deg,#9678ff,#c050f0,#ff3c78)"></span>Violeta: lluvia estimada por modelo</div>
         </div>
-        <div class="legend-note">Tonos fríos = lluvia débil, cálidos = intensa. Escala del radar RainViewer.</div>
+        <div class="legend-note">Tonos fríos = lluvia débil, cálidos = intensa (radar RainViewer). El violeta es una estimación del modelo, más gruesa; donde hay radar, manda el radar.</div>
       </div>
 
       <div class="sec">
@@ -425,6 +428,7 @@
   function hd(native,max){return {detectRetina:true,maxNativeZoom:RET?native-1:native,maxZoom:RET?max+1:max};}
   var base=hd(16,17);
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',base).addTo(map);
+  map.createPane('modelPane');map.getPane('modelPane').style.zIndex=345;map.getPane('modelPane').style.pointerEvents='none';
   map.createPane('radarPane');map.getPane('radarPane').style.zIndex=350;map.getPane('radarPane').style.pointerEvents='none';
   // blur muy sutil: difumina las fronteras cuadradas entre celdas del radar sin perder forma
   map.getPane('radarPane').style.filter='blur(1.5px) saturate(1.3) contrast(1.08)';
@@ -523,6 +527,7 @@
     if(loading||!frames.length)return;
     if(p>=frames.length)p=0;if(p<0)p=frames.length-1;
     var frame=frames[p], isNow=frame.__nowcast;
+    mgShow(frame.time);
     var tag=$('tlTag');tag.textContent=isNow?'Pronóstico':'Pasado';tag.classList.toggle('now',isNow);
     $('tlTime').textContent=fmtTime(frame.time)+(isNow?' · +'+frame.__fc*10+' min':'');$('pFrame').textContent=fmtTime(frame.time);
     $('tlScrub').value=p;
@@ -1285,6 +1290,83 @@
       if(rt.a&&rt.b){rt.fit=true;runRoute();}};
   });
 
+  // ============ CAPA DE LLUVIA DEL MODELO (Open-Meteo, rejilla) ============
+  // El radar tiene huecos de cobertura (p. ej. Puebla) y no ve llovizna debil. Esta capa muestra, en violeta, la lluvia
+  // estimada por un modelo meteorologico sobre una rejilla de ~35 km, por hora, interpolada en espacio y tiempo.
+  // Va debajo del radar: donde el radar tiene datos, manda el radar.
+  var MG={NX:14,NY:12,times:null,vals:null,at:0,layer:null,slot:null,busy:null};
+  function mgPoints(){
+    var pts=[],i,j;
+    for(j=0;j<MG.NY;j++)for(i=0;i<MG.NX;i++)
+      pts.push([BOUNDS[1][0]-(BOUNDS[1][0]-BOUNDS[0][0])*j/(MG.NY-1),BOUNDS[0][1]+(BOUNDS[1][1]-BOUNDS[0][1])*i/(MG.NX-1)]);
+    return pts;
+  }
+  function mgFetch(ch){
+    var url='https://api.open-meteo.com/v1/forecast?latitude='+ch.map(function(p){return p[0].toFixed(3);}).join(',')+
+      '&longitude='+ch.map(function(p){return p[1].toFixed(3);}).join(',')+'&hourly=precipitation&forecast_days=2&timezone=UTC&timeformat=unixtime';
+    return fetch(url).then(function(r){if(!r.ok)throw new Error('modelo '+r.status);return r.json();}).then(function(j){return Array.isArray(j)?j:[j];});
+  }
+  function mgLoad(){
+    if(MG.vals&&Date.now()-MG.at<1800000)return Promise.resolve();
+    try{var c=JSON.parse(localStorage.getItem('lluvia:mg')||'null');
+      if(c&&c.v===1&&Date.now()-c.at<1800000&&c.vals&&c.vals.length){MG.times=c.times;MG.vals=c.vals;MG.at=c.at;return Promise.resolve();}}catch(e){}
+    if(MG.busy)return MG.busy;
+    var pts=mgPoints(),chunks=[],k;
+    for(k=0;k<pts.length;k+=42)chunks.push(pts.slice(k,k+42));
+    MG.busy=Promise.all(chunks.map(mgFetch)).then(function(parts){
+      var flat=[].concat.apply([],parts);
+      if(flat.length!==pts.length)throw new Error('modelo incompleto');
+      var times=flat[0].hourly.time;
+      MG.vals=times.map(function(_,h){return flat.map(function(o){return Math.round((o.hourly.precipitation[h]||0)*10)/10;});});
+      MG.times=times;MG.at=Date.now();MG.slot=null;
+      try{localStorage.setItem('lluvia:mg',JSON.stringify({v:1,at:MG.at,times:MG.times,vals:MG.vals}));}catch(e){}
+    }).then(function(){MG.busy=null;},function(e){MG.busy=null;throw e;});
+    return MG.busy;
+  }
+  // lluvia (mm/h) en la rejilla para el instante t (s unix): interpolacion lineal entre horas (el dato horario es la suma de la hora previa)
+  function mgGrid(t){
+    var ts=MG.times,x=t+1800,k=0,n=ts.length,i;
+    for(i=0;i<n;i++)if(ts[i]<=x)k=i;
+    var k2=Math.min(n-1,k+1),f=k2>k?Math.min(1,Math.max(0,(x-ts[k])/(ts[k2]-ts[k]))):0,a=MG.vals[k],b=MG.vals[k2],out=new Float32Array(a.length);
+    for(i=0;i<a.length;i++)out[i]=a[i]*(1-f)+b[i]*f;
+    return out;
+  }
+  var MG_RAMP=[[0.05,150,120,255,0],[0.2,150,120,255,70],[1,170,100,255,125],[3,200,80,240,165],[8,240,60,190,200],[20,255,60,110,225]];
+  function mgColor(v,px,o){
+    var r=MG_RAMP,i;
+    if(v<=r[0][0]){px[o]=px[o+1]=px[o+2]=px[o+3]=0;return;}
+    if(v>=r[r.length-1][0])i=r.length-2;else{i=0;while(v>r[i+1][0])i++;}
+    var a=r[i],b=r[i+1],f=Math.min(1,(v-a[0])/(b[0]-a[0]));
+    px[o]=a[1]+(b[1]-a[1])*f;px[o+1]=a[2]+(b[2]-a[2])*f;px[o+2]=a[3]+(b[3]-a[3])*f;px[o+3]=a[4]+(b[4]-a[4])*f;
+  }
+  function mgCanvas(t){
+    var g=mgGrid(t),W=168,H=134,c=document.createElement('canvas');c.width=W;c.height=H;
+    var x=c.getContext('2d'),im=x.createImageData(W,H),NX=MG.NX,NY=MG.NY;
+    for(var py=0;py<H;py++){
+      var gy=py/(H-1)*(NY-1),j0=Math.min(NY-2,Math.floor(gy)),fy=gy-j0;
+      for(var px=0;px<W;px++){
+        var gx=px/(W-1)*(NX-1),i0=Math.min(NX-2,Math.floor(gx)),fx=gx-i0;
+        var v=(g[j0*NX+i0]*(1-fx)+g[j0*NX+i0+1]*fx)*(1-fy)+(g[(j0+1)*NX+i0]*(1-fx)+g[(j0+1)*NX+i0+1]*fx)*fy;
+        mgColor(v,im.data,(py*W+px)*4);
+      }
+    }
+    x.putImageData(im,0,0);return c;
+  }
+  function mgHide(){if(MG.layer){map.removeLayer(MG.layer);MG.layer=null;MG.slot=null;}}
+  function mgShow(t){
+    if(!MG.vals||!$('tModel').checked){return;}
+    var slot=Math.round(t/900);if(slot===MG.slot&&MG.layer)return;
+    MG.slot=slot;var url=mgCanvas(t).toDataURL('image/png');
+    if(MG.layer)MG.layer.setUrl(url);
+    else{MG.layer=L.imageOverlay(url,L.latLngBounds(BOUNDS),{pane:'modelPane',opacity:0.6,interactive:false,className:'radar-tiles'}).addTo(map);}
+  }
+  function mgRefresh(){
+    if(!$('tModel').checked)return Promise.resolve();
+    if(MG.failAt&&Date.now()-MG.failAt<300000)return Promise.resolve(); // tras un fallo (p. ej. 429) no insistir durante 5 min
+    return mgLoad().then(function(){MG.failAt=0;mgShow(frames[pos]?frames[pos].time:Date.now()/1000);})
+      .catch(function(e){MG.failAt=Date.now();console.warn('[lluvia] capa de modelo no disponible',e);});
+  }
+
   // ============ CUADROS DE PRONOSTICO EN EL MAPA (+10 ... +60 min) ============
   // El ultimo cuadro de radar se descarga como mosaico z7 (cubre toda la zona de la app) y se desplaza con el movimiento
   // estimado por el modelo; la incertidumbre crece con el horizonte (suavizado y menor opacidad). Se agregan al final de la
@@ -1444,6 +1526,7 @@
     });
   }
   function update(){
+    mgRefresh(); // la capa del modelo no depende del radar
     return loadRadar().then(function(){
       setSub('En vivo · actualizado '+new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}));
       $('stamp').textContent=new Date().toLocaleTimeString('es-MX');hideBanner();
@@ -1456,6 +1539,7 @@
   $('tlScrub').oninput=function(e){stop();showFrame(parseInt(e.target.value,10));};
   $('tRadar').onchange=function(e){if(!e.target.checked){if(curLayer)curLayer.setOpacity(0);}else showFrame(pos);};
   $('tVec').onchange=function(){ if(!$('tVec').checked)clearVec(); else renderVector(); };
+  $('tModel').onchange=function(){if($('tModel').checked)mgRefresh();else mgHide();};
   $('tNow').onchange=function(){stop();buildForecastFrames();};
   var timer=setInterval(update,REFRESH_MS);
   $('tAuto').onchange=function(e){clearInterval(timer);if(e.target.checked)timer=setInterval(update,REFRESH_MS);};
