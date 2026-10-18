@@ -200,6 +200,11 @@
     background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);color:var(--text);
     border:1.5px solid var(--hair);border-radius:14px;padding:7px 12px;font:600 12px var(--sys);cursor:pointer}
   .rt-chip.on{display:block}
+  .mg-hint{position:absolute;top:calc(var(--safe-top) + 112px);left:16px;z-index:33;display:none;align-items:center;gap:7px;
+    background:var(--glass);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:.5px solid var(--hair);
+    border-radius:12px;padding:5px 10px;font:600 11px var(--sys);color:var(--dim);pointer-events:none}
+  .mg-hint.on{display:flex}
+  .mg-hint i{width:14px;height:8px;border-radius:2px;background:linear-gradient(90deg,#9678ff,#c050f0,#ff3c78)}
   .rt-modes{display:flex;gap:8px;margin-bottom:10px}
   .rt-modes button{flex:1;background:rgba(255,255,255,.05);border:1.5px solid var(--hair);border-radius:12px;padding:8px 4px;
     color:var(--text);font:600 13px var(--sys);cursor:pointer}
@@ -288,6 +293,7 @@
 
   <div class="banner" id="banner"></div>
   <div class="pick-hint" id="pickHint"></div>
+  <div class="mg-hint" id="mgHint"><i></i>Violeta: lluvia estimada por modelo</div>
   <button class="rt-chip" id="rtChip"></button>
 
   <div class="timeline" id="timeline">
@@ -1331,7 +1337,8 @@
     for(i=0;i<a.length;i++)out[i]=a[i]*(1-f)+b[i]*f;
     return out;
   }
-  var MG_RAMP=[[0.05,150,120,255,0],[0.2,150,120,255,70],[1,170,100,255,125],[3,200,80,240,165],[8,240,60,190,200],[20,255,60,110,225]];
+  var MG_MIN=0.3; // por debajo (llovizna difusa) no se pinta: tenia teñido todo el mapa
+  var MG_RAMP=[[0.3,150,120,255,0],[0.8,150,120,255,60],[2,175,100,255,110],[5,205,80,240,150],[10,240,60,190,190],[20,255,60,110,225]];
   function mgColor(v,px,o){
     var r=MG_RAMP,i;
     if(v<=r[0][0]){px[o]=px[o+1]=px[o+2]=px[o+3]=0;return;}
@@ -1352,13 +1359,15 @@
     }
     x.putImageData(im,0,0);return c;
   }
-  function mgHide(){if(MG.layer){map.removeLayer(MG.layer);MG.layer=null;MG.slot=null;}}
+  function mgHide(){$('mgHint').classList.remove('on');if(MG.layer){map.removeLayer(MG.layer);MG.layer=null;MG.slot=null;}}
   function mgShow(t){
     if(!MG.vals||!$('tModel').checked){return;}
     var slot=Math.round(t/900);if(slot===MG.slot&&MG.layer)return;
-    MG.slot=slot;var url=mgCanvas(t).toDataURL('image/png');
+    MG.slot=slot;var cv=mgCanvas(t),url=cv.toDataURL('image/png');
+    var mx=0,gg=mgGrid(t);for(var q=0;q<gg.length;q++)if(gg[q]>mx)mx=gg[q];
+    $('mgHint').classList.toggle('on',mx>=MG_MIN);
     if(MG.layer)MG.layer.setUrl(url);
-    else{MG.layer=L.imageOverlay(url,L.latLngBounds(BOUNDS),{pane:'modelPane',opacity:0.6,interactive:false,className:'radar-tiles'}).addTo(map);}
+    else{MG.layer=L.imageOverlay(url,L.latLngBounds(BOUNDS),{pane:'modelPane',opacity:0.5,interactive:false,className:'radar-tiles'}).addTo(map);}
   }
   function mgRefresh(){
     if(!$('tModel').checked)return Promise.resolve();
